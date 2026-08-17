@@ -1,5 +1,3 @@
-export type MatchStatus = 'scheduled' | 'live' | 'finished';
-
 export type LeagueId = 'battle' | 'battle-volta' | 'gt-leagues' | 'h2h-gg';
 
 export interface League {
@@ -7,36 +5,43 @@ export interface League {
   name: string;
   matchMinutes: number;
   source: string;
+  players: number;
+  matches: number;
 }
 
-export interface MatchSide {
-  player: string;
-  team: string;
-  score: number | null;
+export interface NamedCount {
+  name: string;
+  played: number;
 }
 
-export interface Match {
+export interface H2HMatch {
   id: string;
-  leagueId: LeagueId;
   playedAt: string;
-  status: MatchStatus;
-  home: MatchSide;
-  away: MatchSide;
+  teamA: string;
+  teamB: string;
+  scoreA: number;
+  scoreB: number;
+  result: 'A' | 'B' | 'D';
+  aWasHome: boolean;
 }
 
-export interface LiveResponse {
-  leagues: League[];
-  matches: Match[];
-}
-
-export interface H2HResponse {
+export interface H2HResult {
+  league: LeagueId;
   playerA: string;
   playerB: string;
+  teamA: string | null;
+  teamB: string | null;
+  played: number;
   winsA: number;
   winsB: number;
   draws: number;
-  goalsA: number | null;
-  goalsB: number | null;
-  matches: Match[];
-  source: 'native' | 'sampled';
+  goalsA: number;
+  goalsB: number;
+  matches: H2HMatch[];
+}
+
+export interface HistoryStatus {
+  state: 'empty' | 'loading' | 'ready';
+  matches: number;
+  updatedAt: number;
 }

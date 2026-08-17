@@ -1,31 +1,51 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import './App.css';
-import { LeagueBoard } from './components/LeagueBoard';
-import { H2HView } from './components/H2HView';
+import { H2HPage } from './components/H2HPage';
+import { LeagueSelect } from './components/LeagueSelect';
+import { fetchLeagues } from './lib/api';
+import type { League } from './types';
 
-type Tab = 'live' | 'h2h';
+export default function App() {
+  const [leagues, setLeagues] = useState<League[]>([]);
+  const [selected, setSelected] = useState<League | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-function App() {
-  const [tab, setTab] = useState<Tab>('live');
+  useEffect(() => {
+    let cancelled = false;
+
+    function load() {
+      fetchLeagues()
+        .then((list) => !cancelled && setLeagues(list))
+        .catch((err) => !cancelled && setError(err.message));
+    }
+
+    load();
+    // Counts fill in as the backfill lands, so keep the landing page honest.
+    const poll = setInterval(load, 20_000);
+    return () => {
+      cancelled = true;
+      clearInterval(poll);
+    };
+  }, []);
 
   return (
-    <div className="app">
-      <header className="app__header">
-        <h1>dashfifa</h1>
-        <nav className="app__tabs">
-          <button className={tab === 'live' ? 'active' : ''} onClick={() => setTab('live')}>
-            Jogos
-          </button>
-          <button className={tab === 'h2h' ? 'active' : ''} onClick={() => setTab('h2h')}>
-            Head to Head
-          </button>
-        </nav>
-      </header>
-      <main className="app__main">
-        {tab === 'live' ? <LeagueBoard /> : <H2HView />}
+    <div className="shell">
+      <nav className="brand">
+        <button className="brand__mark" onClick={() => setSelected(null)}>
+          dashfifa
+        </button>
+      </nav>
+
+      <main className="shell__main">
+        {error && <p className="notice notice--warn">{error}</p>}
+        {!error && leagues.length === 0 && <p className="notice">Carregando ligas…</p>}
+
+        {selected ? (
+          <H2HPage league={selected} onBack={() => setSelected(null)} />
+        ) : (
+          leagues.length > 0 && <LeagueSelect leagues={leagues} onPick={setSelected} />
+        )}
       </main>
     </div>
   );
 }
-
-export default App;

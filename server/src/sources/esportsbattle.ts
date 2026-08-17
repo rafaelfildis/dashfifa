@@ -1,7 +1,12 @@
-import type { Match, MatchStatus } from '../types.js';
+import { fetchJson, isoDate, mapLimit } from '../http.js';
+import type { LeagueId, Match, MatchStatus } from '../types.js';
 
 const BASE = 'https://football.esportsbattle.com/api';
-const HEADERS = { 'User-Agent': 'Mozilla/5.0 (dashfifa)' };
+const HEADERS = { 'User-Agent': 'Mozilla/5.0 (dashfifa)', Accept: 'application/json' };
+
+function get<T>(path: string, timeoutMs?: number): Promise<T> {
+  return fetchJson<T>(`${BASE}${path}`, { headers: HEADERS, timeoutMs });
+}
 
 function mapStatus(statusId: number): MatchStatus | null {
   if (statusId === 1) return 'scheduled';
@@ -10,11 +15,9 @@ function mapStatus(statusId: number): MatchStatus | null {
   return null; // canceled / deleted
 }
 
-interface RawLocation {
-  id: number;
-  token_international: string;
-  matchCount: number;
-  tournaments: number[];
+/** ESportsBattle runs Volta (6min street football) alongside its regular 8min leagues. */
+function leagueIdForLeagueName(name: string): LeagueId {
+  return /volta/i.test(name) ? 'battle-volta' : 'battle';
 }
 
 interface RawTeam {
@@ -23,15 +26,14 @@ interface RawTeam {
 
 interface RawParticipant {
   nickname: string;
+  score?: number | null;
   team: RawTeam;
-  score?: number;
 }
 
-interface RawStreamingMatch {
+interface RawMatch {
   id: number;
   status_id: number;
   date: string;
-  tournament: { id: number; token_international: string };
   participant1: RawParticipant;
   participant2: RawParticipant;
 }
@@ -39,103 +41,94 @@ interface RawStreamingMatch {
 interface RawStreamingGroup {
   id: number;
   token_international: string;
-  matches: RawStreamingMatch[];
+  matches: (RawMatch & { tournament: { id: number; token_international: string } })[];
 }
 
-interface RawNearestMatch {
+interface RawLocation {
   id: number;
-  status_id: number;
-  date: string;
-  location: { id: number };
-  participant1: RawParticipant;
-  participant2: RawParticipant;
+  matchCount: number;
+  tournaments: number[];
 }
 
-const tournamentNameCache = new Map<number, string>();
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: HEADERS });
-  if (!res.ok) throw new Error(`ESportsBattle request failed: ${url} (${res.status})`);
-  return res.json() as Promise<T>;
+interface RawTournamentSummary {
+  id: number;
+  token_international: string;
+  league: { token_international: string };
 }
 
-async function resolveTournamentName(tournamentId: number): Promise<string> {
-  const cached = tournamentNameCache.get(tournamentId);
-  if (cached) return cached;
-  try {
-    const data = await fetchJson<{ token_international: string }>(
-      `${BASE}/tournaments/${tournamentId}/results`,
-    );
-    tournamentNameCache.set(tournamentId, data.token_international);
-    return data.token_international;
-  } catch {
-    return 'ESportsBattle';
-  }
+function toMatch(raw: RawMatch, leagueId: LeagueId, status: MatchStatus): Match {
+  return {
+    id: `eb-${raw.id}`,
+    leagueId,
+    playedAt: raw.date,
+    status,
+    home: {
+      player: raw.participant1.nickname,
+      team: raw.participant1.team.token_international,
+      score: raw.participant1.score ?? null,
+    },
+    away: {
+      player: raw.participant2.nickname,
+      team: raw.participant2.team.token_international,
+      score: raw.participant2.score ?? null,
+    },
+  };
 }
 
-function leagueIdForTournament(name: string): 'battle' | 'battle-volta' {
-  return /volta/i.test(name) ? 'battle-volta' : 'battle';
-}
+/** Matches currently on air, across every streaming location. */
+export async function fetchEsportsBattleLive(): Promise<Match[]> {
+  const locations = await get<RawLocation[]>('/locations/streaming');
+  const active = locations.filter((l) => l.matchCount > 0);
 
-export async function fetchEsportsBattleMatches(): Promise<Match[]> {
-  const locations = await fetchJson<RawLocation[]>(`${BASE}/locations/streaming`);
-  const activeLocations = locations.filter((l) => l.matchCount > 0);
-
-  const matches: Match[] = [];
-
-  const liveGroups = await Promise.all(
-    activeLocations.map((loc) =>
-      fetchJson<RawStreamingGroup[]>(`${BASE}/locations/${loc.id}/streaming`).catch(() => []),
-    ),
+  const groups = await mapLimit(active, 4, (loc) =>
+    get<RawStreamingGroup[]>(`/locations/${loc.id}/streaming`).catch(() => [] as RawStreamingGroup[]),
   );
 
-  for (const groups of liveGroups) {
-    for (const group of groups) {
-      tournamentNameCache.set(group.id, group.token_international);
-      const leagueId = leagueIdForTournament(group.token_international);
-      for (const m of group.matches) {
-        const status = mapStatus(m.status_id);
-        if (!status) continue;
-        matches.push({
-          id: `eb-${m.id}`,
-          leagueId,
-          playedAt: m.date,
-          status,
-          home: {
-            player: m.participant1.nickname,
-            team: m.participant1.team.token_international,
-            score: m.participant1.score ?? null,
-          },
-          away: {
-            player: m.participant2.nickname,
-            team: m.participant2.team.token_international,
-            score: m.participant2.score ?? null,
-          },
-        });
-      }
+  const matches: Match[] = [];
+  for (const group of groups.flat()) {
+    const leagueId = leagueIdForLeagueName(group.token_international);
+    for (const raw of group.matches) {
+      const status = mapStatus(raw.status_id);
+      if (status) matches.push(toMatch(raw, leagueId, status));
     }
   }
-
-  const locationTournament = new Map<number, number>();
-  for (const loc of locations) {
-    if (loc.tournaments[0] != null) locationTournament.set(loc.id, loc.tournaments[0]);
-  }
-
-  const nearest = await fetchJson<RawNearestMatch[]>(`${BASE}/tournaments/nearest-matches`);
-  for (const m of nearest) {
-    const status = mapStatus(m.status_id);
-    if (!status || status !== 'scheduled') continue;
-    const tournamentId = locationTournament.get(m.location.id);
-    const tournamentName = tournamentId ? await resolveTournamentName(tournamentId) : 'ESportsBattle';
-    matches.push({
-      id: `eb-${m.id}`,
-      leagueId: leagueIdForTournament(tournamentName),
-      playedAt: m.date,
-      status,
-      home: { player: m.participant1.nickname, team: m.participant1.team.token_international, score: null },
-      away: { player: m.participant2.nickname, team: m.participant2.team.token_international, score: null },
-    });
-  }
-
   return matches;
+}
+
+/** Finished matches from every tournament that ran in the last `days` days. */
+export async function fetchEsportsBattleHistory(days: number): Promise<Match[]> {
+  const dateFrom = isoDate(days);
+  const dateTo = isoDate(-1); // tomorrow, so today's tournaments are included
+
+  const first = await get<{ totalPages: number; tournaments: RawTournamentSummary[] }>(
+    `/tournaments?page=1&dateFrom=${dateFrom}&dateTo=${dateTo}`,
+    20_000,
+  );
+
+  const pages = Array.from({ length: Math.max(0, first.totalPages - 1) }, (_, i) => i + 2);
+  const rest = await mapLimit(pages, 3, (page) =>
+    get<{ tournaments: RawTournamentSummary[] }>(
+      `/tournaments?page=${page}&dateFrom=${dateFrom}&dateTo=${dateTo}`,
+      20_000,
+    )
+      .then((r) => r.tournaments)
+      .catch(() => [] as RawTournamentSummary[]),
+  );
+
+  const tournaments = [...first.tournaments, ...rest.flat()];
+
+  const perTournament = await mapLimit(tournaments, 5, async (t) => {
+    const leagueId = leagueIdForLeagueName(t.league.token_international);
+    const raws = await get<RawMatch[]>(`/tournaments/${t.id}/matches`, 20_000).catch(
+      () => [] as RawMatch[],
+    );
+    return raws
+      .map((raw) => {
+        const status = mapStatus(raw.status_id);
+        return status ? toMatch(raw, leagueId, status) : null;
+      })
+      .filter((m): m is Match => m !== null);
+  });
+
+  return perTournament.flat();
 }

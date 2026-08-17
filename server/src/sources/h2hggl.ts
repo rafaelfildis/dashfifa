@@ -1,6 +1,7 @@
+import { fetchJson, mapLimit } from '../http.js';
 import type { Match } from '../types.js';
 
-const API_BASE = 'https://api-h2h.hudstats.com/v1';
+const BASE = 'https://api-h2h.hudstats.com/v1';
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (dashfifa)',
   Origin: 'https://h2hggl.com',
@@ -8,65 +9,58 @@ const HEADERS = {
   Accept: 'application/json',
 };
 
-interface RawLiveMatch {
+function get<T>(path: string, timeoutMs?: number): Promise<T> {
+  return fetchJson<T>(`${BASE}${path}`, { headers: HEADERS, timeoutMs });
+}
+
+interface RawMatch {
   externalId: string;
   startDate: string;
   teamAName: string;
   teamBName: string;
   participantAName: string;
   participantBName: string;
-  status: 'live' | 'not_started' | 'scheduled' | string;
   teamAScore: number | null;
   teamBScore: number | null;
+  status?: string;
+  matchStatus?: string | null;
 }
 
-interface RawPastMatch {
-  externalId: string;
-  startDate: string;
-  teamAName: string;
-  teamBName: string;
-  participantAName: string;
-  participantBName: string;
-  matchStatus: string | null;
-  teamAScore: number | null;
-  teamBScore: number | null;
-}
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: HEADERS });
-  if (!res.ok) throw new Error(`H2H GG League request failed: ${url} (${res.status})`);
-  return res.json() as Promise<T>;
-}
-
-export async function fetchH2hgglMatches(): Promise<Match[]> {
-  const live = await fetchJson<RawLiveMatch[]>(`${API_BASE}/live/fifa`);
-
-  return live.map((m): Match => ({
-    id: `h2h-${m.externalId}`,
+function toMatch(raw: RawMatch): Match {
+  const ended = raw.matchStatus === 'MATCH_ENDED';
+  const live = raw.status === 'live';
+  return {
+    id: `h2h-${raw.externalId}`,
     leagueId: 'h2h-gg',
-    playedAt: m.startDate,
-    status: m.status === 'live' ? 'live' : 'scheduled',
-    home: { player: m.participantAName, team: m.teamAName, score: m.teamAScore },
-    away: { player: m.participantBName, team: m.teamBName, score: m.teamBScore },
-  }));
+    playedAt: raw.startDate,
+    status: ended ? 'finished' : live ? 'live' : 'scheduled',
+    home: { player: raw.participantAName, team: raw.teamAName, score: raw.teamAScore },
+    away: { player: raw.participantBName, team: raw.teamBName, score: raw.teamBScore },
+  };
 }
 
-export async function fetchH2hgglParticipantNames(): Promise<string[]> {
-  return fetchJson<string[]>(`${API_BASE}/participant/fifa/names`);
+export async function fetchH2hgglLive(): Promise<Match[]> {
+  const raws = await get<RawMatch[]>('/live/fifa');
+  return raws.map(toMatch);
 }
 
-export interface H2hgglPairwise {
-  h2H: string[];
-  participantAStats: Record<string, unknown> & { participantName: string };
-  participantBStats: Record<string, unknown> & { participantName: string };
+/** The site exposes a full day of fixtures per date, which is our history source. */
+export async function fetchH2hgglHistory(days: number): Promise<Match[]> {
+  const dates = Array.from({ length: days }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    return d.toISOString().slice(0, 10);
+  });
+
+  const perDay = await mapLimit(dates, 3, (date) =>
+    get<RawMatch[]>(`/schedule/fifa?date=${date}T00:00:00-03:00`, 25_000).catch(
+      () => [] as RawMatch[],
+    ),
+  );
+
+  return perDay.flat().map(toMatch);
 }
 
-export async function fetchH2hgglPairwise(a: string, b: string): Promise<H2hgglPairwise> {
-  const url = `${API_BASE}/h2h/fifa/participants?participant_a=${encodeURIComponent(a)}&participant_b=${encodeURIComponent(b)}`;
-  return fetchJson<H2hgglPairwise>(url);
-}
-
-export async function fetchH2hgglPastMatches(participant: string): Promise<RawPastMatch[]> {
-  const url = `${API_BASE}/schedule/past/fifa?participant=${encodeURIComponent(participant)}`;
-  return fetchJson<RawPastMatch[]>(url);
+export function fetchH2hgglParticipantNames(): Promise<string[]> {
+  return get<string[]>('/participant/fifa/names');
 }

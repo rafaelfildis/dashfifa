@@ -1,22 +1,40 @@
-import type { H2HResponse, LeagueId, LiveResponse } from '../types';
+import type { H2HResult, HistoryStatus, League, LeagueId, NamedCount } from '../types';
 
-export async function fetchLive(): Promise<LiveResponse> {
-  const res = await fetch('/api/live');
-  if (!res.ok) throw new Error(`Failed to fetch live data (${res.status})`);
+async function get<T>(path: string): Promise<T> {
+  const res = await fetch(path);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.error ?? `Falha na requisição (${res.status})`);
+  }
   return res.json();
 }
 
-export async function fetchPlayers(league?: LeagueId): Promise<string[]> {
-  const query = league ? `?league=${encodeURIComponent(league)}` : '';
-  const res = await fetch(`/api/players${query}`);
-  if (!res.ok) throw new Error(`Failed to fetch players (${res.status})`);
-  return res.json();
+export function fetchLeagues(): Promise<League[]> {
+  return get<League[]>('/api/leagues');
 }
 
-export async function fetchH2H(a: string, b: string, league?: LeagueId): Promise<H2HResponse> {
-  const params = new URLSearchParams({ a, b });
-  if (league) params.set('league', league);
-  const res = await fetch(`/api/h2h?${params.toString()}`);
-  if (!res.ok) throw new Error(`Failed to fetch head-to-head (${res.status})`);
-  return res.json();
+export function fetchStatus(): Promise<HistoryStatus> {
+  return get<HistoryStatus>('/api/status');
+}
+
+export function fetchPlayers(league: LeagueId): Promise<NamedCount[]> {
+  return get<NamedCount[]>(`/api/players?league=${encodeURIComponent(league)}`);
+}
+
+export function fetchTeams(league: LeagueId, player: string): Promise<NamedCount[]> {
+  const params = new URLSearchParams({ league, player });
+  return get<NamedCount[]>(`/api/teams?${params}`);
+}
+
+export function fetchH2H(
+  league: LeagueId,
+  a: string,
+  b: string,
+  teamA: string,
+  teamB: string,
+): Promise<H2HResult> {
+  const params = new URLSearchParams({ league, a, b, limit: '10' });
+  if (teamA) params.set('teamA', teamA);
+  if (teamB) params.set('teamB', teamB);
+  return get<H2HResult>(`/api/h2h?${params}`);
 }
