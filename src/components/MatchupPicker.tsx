@@ -38,6 +38,7 @@ export function MatchupPicker({
           value={playerA}
           options={players}
           emptyLabel="Escolher jogador"
+          clearLabel="Limpar seleção"
           onChange={(name) => onPlayer('a', name)}
         />
         <Combo
@@ -47,7 +48,7 @@ export function MatchupPicker({
           value={teamA}
           options={teamsA}
           emptyLabel="Qualquer time"
-          clearable
+          clearLabel="Qualquer time"
           onChange={(name) => onTeam('a', name)}
         />
       </div>
@@ -74,6 +75,7 @@ export function MatchupPicker({
           value={playerB}
           options={players}
           emptyLabel="Escolher jogador"
+          clearLabel="Limpar seleção"
           onChange={(name) => onPlayer('b', name)}
         />
         <Combo
@@ -83,7 +85,7 @@ export function MatchupPicker({
           value={teamB}
           options={teamsB}
           emptyLabel="Qualquer time"
-          clearable
+          clearLabel="Qualquer time"
           onChange={(name) => onTeam('b', name)}
         />
       </div>

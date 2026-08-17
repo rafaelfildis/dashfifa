@@ -8,10 +8,10 @@ interface Props {
   label: string;
   value: string;
   options: NamedCount[];
-  /** Texto do gatilho quando nada está escolhido — e da linha que limpa a escolha. */
+  /** Texto do gatilho quando nada está escolhido. */
   emptyLabel: string;
-  /** Só o seletor de time pode voltar a "qualquer". */
-  clearable?: boolean;
+  /** Texto da primeira linha, que devolve a escolha ao estado vazio. */
+  clearLabel: string;
   onChange: (value: string) => void;
 }
 
@@ -27,7 +27,7 @@ export function Combo({
   value,
   options,
   emptyLabel,
-  clearable = false,
+  clearLabel,
   onChange,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -42,17 +42,25 @@ export function Combo({
     const q = query.trim().toLowerCase();
     const hits = q ? options.filter((o) => o.name.toLowerCase().includes(q)) : options;
     // A linha que limpa só faz sentido enquanto a lista está inteira.
-    return clearable && !q ? [{ name: '', played: 0 }, ...hits] : hits;
-  }, [clearable, options, query]);
+    return q ? hits : [{ name: '', played: 0 }, ...hits];
+  }, [options, query]);
+
+  // Ao abrir, o cursor pousa no que já está escolhido; ao digitar, no primeiro
+  // resultado. Sem isso, um Enter logo na abertura limparia a seleção.
+  useEffect(() => {
+    if (!open) return;
+    const at = rows.findIndex((row) => row.name === value);
+    setCursor(at >= 0 ? at : 0);
+  }, [open]);
 
   useEffect(() => {
     setCursor(0);
-  }, [query, open]);
+  }, [query]);
 
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: PointerEvent) {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
+      if (!root.current?.contains(event.target as Node)) dismiss();
     }
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
@@ -64,9 +72,14 @@ export function Combo({
     list.current?.children[cursor]?.scrollIntoView({ block: 'nearest' });
   }, [cursor, open]);
 
-  function close() {
+  /** Fechar sempre descarta a busca: reabrir com o filtro antigo esconde a lista. */
+  function dismiss() {
     setOpen(false);
     setQuery('');
+  }
+
+  function close() {
+    dismiss();
     trigger.current?.focus();
   }
 
@@ -109,7 +122,7 @@ export function Combo({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={label}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => (open ? dismiss() : setOpen(true))}
       >
         <span className="combo__value">{value || emptyLabel}</span>
         <span className="combo__meta num">
@@ -148,7 +161,7 @@ export function Combo({
                 onMouseEnter={() => setCursor(index)}
                 onClick={() => choose(option.name)}
               >
-                <span className="combo__opt-name">{option.name || emptyLabel}</span>
+                <span className="combo__opt-name">{option.name || clearLabel}</span>
                 {option.name && <span className="combo__opt-count num">{option.played}</span>}
               </li>
             ))}
