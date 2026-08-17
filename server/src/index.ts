@@ -10,7 +10,7 @@ import {
   matchesInLeague,
   startBackgroundJobs,
 } from './store.js';
-import { buildStats, type OrientedMatch } from './stats.js';
+import { buildBaseline, buildStats, type OrientedMatch } from './stats.js';
 import type { LeagueId, Match } from './types.js';
 
 const app = express();
@@ -134,7 +134,9 @@ app.get('/api/h2h', (req, res) => {
   const teamB = typeof req.query.teamB === 'string' && req.query.teamB ? req.query.teamB : null;
   const limit = Math.min(Number(req.query.limit) || 15, 50);
 
-  const encounters = finishedInLeague(league)
+  const leagueMatches = finishedInLeague(league);
+
+  const encounters = leagueMatches
     .filter((m) => {
       const players = [m.home.player, m.away.player];
       return players.includes(a) && players.includes(b);
@@ -157,6 +159,21 @@ app.get('/api/h2h', (req, res) => {
     { winsA: 0, winsB: 0, draws: 0, goalsA: 0, goalsB: 0 },
   );
 
+  // Pair samples are often tiny, so each player's whole league record travels
+  // alongside as the wider reference.
+  const gamesOf = (player: string) =>
+    leagueMatches
+      .filter((m) => m.home.player === player || m.away.player === player)
+      .map((m) => {
+        const isHome = m.home.player === player;
+        return {
+          for: (isHome ? m.home.score : m.away.score) ?? 0,
+          against: (isHome ? m.away.score : m.home.score) ?? 0,
+        };
+      });
+
+  const baseline = { a: buildBaseline(a, gamesOf(a)), b: buildBaseline(b, gamesOf(b)) };
+
   res.json({
     league,
     playerA: a,
@@ -166,7 +183,7 @@ app.get('/api/h2h', (req, res) => {
     played: encounters.length,
     ...totals,
     matches: recent,
-    stats: buildStats(encounters, a, b),
+    stats: buildStats(encounters, a, b, baseline),
   });
 });
 

@@ -40,14 +40,49 @@ export interface GoalWindow {
   avgB: number;
 }
 
+export interface TotalLine {
+  line: number;
+  over: MarketLine;
+  under: MarketLine;
+}
+
+export interface AsianLine {
+  line: number;
+  label: string;
+  wins: number;
+  halfWins: number;
+  pushes: number;
+  halfLosses: number;
+  losses: number;
+  pct: number;
+  fairOdds: number | null;
+}
+
+export interface PlayerBaseline {
+  player: string;
+  matches: number;
+  avgFor: number;
+  avgAgainst: number;
+  avgTotal: number;
+  winPct: number;
+  drawPct: number;
+}
+
 export interface H2HStats {
   sample: number;
   goalWindows: GoalWindow[];
   result: MarketLine[];
-  overUnder: MarketLine[];
+  totals: TotalLine[];
   drawNoBet: MarketLine[];
+  asian: AsianLine[];
   bothScore: MarketLine;
-  halftime: { sample: number; avgTotal: number; lines: MarketLine[] } | null;
+  halftime: {
+    sample: number;
+    avgTotal: number;
+    totals: TotalLine[];
+    asian: AsianLine[];
+  } | null;
+  baseline: { a: PlayerBaseline; b: PlayerBaseline } | null;
 }
 
 export interface H2HResult {

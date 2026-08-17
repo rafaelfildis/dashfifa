@@ -31,14 +31,29 @@ listam para estas ligas:
 | Bloco | O que mostra |
 | --- | --- |
 | Resultado final | frequência de vitória de cada um e de empate (1X2) |
-| Empate anula | vitórias desconsiderando empates (handicap asiático 0.0) |
-| Total de gols | frequência de "mais de" 2.5 a 7.5 |
-| 1º tempo | média de gols e "mais de" 1.5 / 2.5 no intervalo |
+| Empate anula | vitórias desconsiderando empates (handicap 0.0) |
+| Handicap asiático | linhas de -1.5 a +1.5, incluindo quartos |
+| Total de gols | "mais de" e "menos de", linhas de 2.5 a 7.5 |
+| 1º tempo | handicap e total de gols no intervalo |
 | Ambas marcam | frequência de os dois marcarem |
 
 Cada linha traz a frequência observada e a **odd justa** (1 ÷ frequência, sem
 margem da casa). São frequências históricas daquele confronto, não previsões —
 quando a amostra tem menos de 10 jogos, a interface avisa.
+
+**Handicap asiático.** As linhas quebradas usam a notação da própria casa
+(`+0.25` aparece como `0.0, +0.5`) e a liquidação é a real: meia-vitória e
+meia-derrota contam metade, e as linhas anuladas saem da conta em vez de
+contarem como derrota. O retrospecto completo de cada linha fica no title da
+linha.
+
+**Cada um na liga inteira.** Como o confronto direto costuma ter poucos jogos,
+o painel também traz o retrospecto de cada jogador na liga toda — normalmente
+centenas de partidas — para servir de referência quando a amostra do par é fina.
+
+**Comparar odds da casa.** O botão no cabeçalho revela um campo por linha: ao
+digitar a odd ofertada, o painel calcula o valor esperado (`freq × odd − 1`).
+Positivo significa que a casa está pagando acima do que o histórico sustenta.
 
 O bloco de 1º tempo só aparece em Battle e Battle Volta: o ESportsBattle publica
 o placar do intervalo (`prevPeriodsScores`), GT Leagues e H2H GG não.
