@@ -1,0 +1,76 @@
+name: Publicar no GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # 06:10 UTC = 03:10 em Brasília, depois da virada do dia nas ligas.
+    - cron: '10 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Uma publicação por vez; não cancela a que já está no ar.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar dependências
+        run: |
+          npm ci
+          npm ci --prefix server
+
+      # O backfill é incremental: com o cache, cada execução só busca os dias
+      # novos em vez de recarregar a janela inteira.
+      - name: Restaurar histórico
+        uses: actions/cache/restore@v4
+        with:
+          path: server/data
+          key: dashfifa-history-${{ github.run_id }}
+          restore-keys: dashfifa-history-
+
+      - name: Atualizar dados e gerar snapshot
+        run: npm run export --prefix server
+        env:
+          HISTORY_DAYS: 45
+
+      - name: Guardar histórico
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: server/data
+          key: dashfifa-history-${{ github.run_id }}
+
+      - name: Build
+        run: npm run build
+        env:
+          BASE_PATH: /dashfifa/
+          VITE_DATA_MODE: static
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

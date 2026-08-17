@@ -59,11 +59,31 @@ Positivo significa que a casa está pagando acima do que o histórico sustenta.
 O bloco de 1º tempo só aparece em Battle e Battle Volta: o ESportsBattle publica
 o placar do intervalo (`prevPeriodsScores`), GT Leagues e H2H GG não.
 
+## Publicação (GitHub Pages)
+
+O Pages serve só arquivos estáticos, e duas das três fontes bloqueiam CORS — o
+backend não pode rodar lá. Por isso o build **embarca um snapshot**: o workflow
+`.github/workflows/pages.yml` roda o backfill, exporta um arquivo compacto por
+liga em `public/data/` (2,4 MB no total, ~560 KB comprimidos) e publica.
+
+O site publicado calcula tudo no navegador a partir desse snapshot, usando o
+mesmo módulo `shared/` do servidor — os números são idênticos aos do modo local.
+O cabeçalho mostra a data do snapshot, e o workflow o regenera todo dia às 06:10
+UTC, além de a cada push na `main`.
+
+**Para ativar na primeira vez:** em *Settings → Pages*, defina *Source* como
+**GitHub Actions**. Sem isso o job de deploy falha.
+
+Modo dos dados: `npm run dev` usa o backend local (ao vivo) e `npm run build`
+usa o snapshot. `VITE_DATA_MODE=server|static` força um dos dois.
+
 ## Arquitetura
 
 - `src/` — frontend React + TypeScript (Vite)
 - `server/` — backend Express que busca, normaliza e mantém em cache o histórico
   das três plataformas
+- `shared/` — tipos, cálculo de estatísticas e do head-to-head, usados pelo
+  servidor e pelo navegador, para que os dois caminhos não divirjam
 
 O backend existe porque duas das três fontes não liberam CORS para chamadas
 diretas do navegador, e porque nenhuma delas oferece um endpoint de confronto

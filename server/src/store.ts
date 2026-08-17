@@ -10,7 +10,7 @@ import {
 } from './sources/esportsbattle.js';
 import { fetchGtLeaguesDay, fetchGtLeaguesLive } from './sources/gtleagues.js';
 import { fetchH2hgglDay, fetchH2hgglLive } from './sources/h2hggl.js';
-import type { LeagueId, Match } from './types.js';
+import type { LeagueId, Match } from '../../shared/types.js';
 
 const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const HISTORY_FILE = join(DATA_DIR, 'history.json');

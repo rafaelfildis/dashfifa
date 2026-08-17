@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import './App.css';
 import { H2HPage } from './components/H2HPage';
 import { LeagueSelect } from './components/LeagueSelect';
-import { fetchLeagues } from './lib/api';
+import { fetchLeagues, fetchSnapshotDate, usingSnapshot } from './lib/api';
 import type { League } from './types';
 
 export default function App() {
   const [leagues, setLeagues] = useState<League[]>([]);
   const [selected, setSelected] = useState<League | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [snapshotAt, setSnapshotAt] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -20,11 +21,14 @@ export default function App() {
     }
 
     load();
-    // Counts fill in as the backfill lands, so keep the landing page honest.
-    const poll = setInterval(load, 20_000);
+    void fetchSnapshotDate().then((at) => !cancelled && setSnapshotAt(at));
+
+    // Against the live backend, counts fill in as the backfill lands. A
+    // snapshot build is fixed, so there is nothing to poll for.
+    const poll = usingSnapshot ? null : setInterval(load, 20_000);
     return () => {
       cancelled = true;
-      clearInterval(poll);
+      if (poll) clearInterval(poll);
     };
   }, []);
 
@@ -34,6 +38,17 @@ export default function App() {
         <button className="brand__mark" onClick={() => setSelected(null)}>
           dashfifa
         </button>
+        {snapshotAt && (
+          <span className="brand__stamp">
+            dados de{' '}
+            {new Date(snapshotAt).toLocaleString('pt-BR', {
+              day: '2-digit',
+              month: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+        )}
       </nav>
 
       <main className="shell__main">

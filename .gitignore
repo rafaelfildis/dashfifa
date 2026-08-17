@@ -25,3 +25,6 @@ dist-ssr
 
 # backend history cache
 server/data/
+
+# snapshot gerado no build
+public/data/

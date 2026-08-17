@@ -1,5 +1,5 @@
 import { fetchJson, isoDate, mapLimit } from '../http.js';
-import type { LeagueId, Match, MatchStatus } from '../types.js';
+import type { LeagueId, Match, MatchStatus } from '../../../shared/types.js';
 
 const BASE = 'https://football.esportsbattle.com/api';
 const HEADERS = { 'User-Agent': 'Mozilla/5.0 (dashfifa)', Accept: 'application/json' };

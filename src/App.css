@@ -14,9 +14,17 @@
 .brand {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   height: 72px;
   border-bottom: 1px solid var(--chalk-line);
   margin-bottom: clamp(32px, 7vw, 64px);
+}
+
+.brand__stamp {
+  font-family: var(--data);
+  font-size: 11px;
+  color: var(--chalk-dim);
 }
 
 .brand__mark {

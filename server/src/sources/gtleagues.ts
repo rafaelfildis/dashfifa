@@ -1,5 +1,5 @@
 import { fetchJson } from '../http.js';
-import type { Match } from '../types.js';
+import type { Match } from '../../../shared/types.js';
 
 const BASE = 'https://api.gtleagues.com/api';
 const MATCH_MINUTES = 12;

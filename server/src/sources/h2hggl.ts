@@ -1,5 +1,5 @@
 import { fetchJson } from '../http.js';
-import type { Match } from '../types.js';
+import type { Match } from '../../../shared/types.js';
 
 const BASE = 'https://api-h2h.hudstats.com/v1';
 const HEADERS = {
