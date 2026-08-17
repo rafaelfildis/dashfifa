@@ -497,6 +497,10 @@
   align-items: center;
 }
 
+.hero__side {
+  min-width: 0;
+}
+
 .hero__side--a {
   text-align: left;
 }
@@ -1859,9 +1863,16 @@
 }
 
 @media (max-width: 768px) {
+  /* Sobra espaço para o nome da liga: o carimbo dos dados repete no rodapé. */
   .topbar__status,
-  .topbar__rule {
+  .topbar__rule,
+  .topbar__source,
+  .topbar__stamp {
     display: none;
+  }
+
+  .topbar__main {
+    gap: 12px;
   }
 
   .picker {
@@ -1886,7 +1897,21 @@
     text-align: left;
   }
 
-  /* O hero mantém as três colunas: é o que torna a comparação legível. */
+  /* O hero mantém as três colunas: é o que torna a comparação legível. A coluna
+     do meio é quem tem de encolher, senão os dois lados ficam sem espaço. */
+  .hero__top {
+    gap: 10px;
+  }
+
+  .hero__mid {
+    padding: 0;
+  }
+
+  .hero__mid-label {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
   .hero__wins {
     font-size: 40px;
   }
