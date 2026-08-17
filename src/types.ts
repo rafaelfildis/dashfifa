@@ -66,13 +66,17 @@ export interface PlayerBaseline {
   avgTotal: number;
   winPct: number;
   drawPct: number;
+  goals: TotalLine[];
 }
 
 export interface H2HStats {
   sample: number;
+  from: string | null;
+  to: string | null;
   goalWindows: GoalWindow[];
   result: MarketLine[];
   totals: TotalLine[];
+  playerGoals: { a: TotalLine[]; b: TotalLine[] };
   drawNoBet: MarketLine[];
   asian: AsianLine[];
   bothScore: MarketLine;

@@ -1,4 +1,4 @@
-import { fetchJson, mapLimit } from '../http.js';
+import { fetchJson } from '../http.js';
 import type { Match } from '../types.js';
 
 const BASE = 'https://api-h2h.hudstats.com/v1';
@@ -44,21 +44,10 @@ export async function fetchH2hgglLive(): Promise<Match[]> {
   return raws.map(toMatch);
 }
 
-/** The site exposes a full day of fixtures per date, which is our history source. */
-export async function fetchH2hgglHistory(days: number): Promise<Match[]> {
-  const dates = Array.from({ length: days }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    return d.toISOString().slice(0, 10);
-  });
-
-  const perDay = await mapLimit(dates, 3, (date) =>
-    get<RawMatch[]>(`/schedule/fifa?date=${date}T00:00:00-03:00`, 25_000).catch(
-      () => [] as RawMatch[],
-    ),
-  );
-
-  return perDay.flat().map(toMatch);
+/** The site exposes a full day of fixtures per date - the unit of work for the backfill. */
+export async function fetchH2hgglDay(date: string): Promise<Match[]> {
+  const raws = await get<RawMatch[]>(`/schedule/fifa?date=${date}T00:00:00-03:00`, 25_000);
+  return raws.map(toMatch);
 }
 
 export function fetchH2hgglParticipantNames(): Promise<string[]> {

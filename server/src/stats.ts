@@ -64,13 +64,20 @@ export interface PlayerBaseline {
   avgTotal: number;
   winPct: number;
   drawPct: number;
+  /** Goals scored by this player, across the whole league. */
+  goals: TotalLine[];
 }
 
 export interface H2HStats {
   sample: number;
+  /** Date range the sample actually spans, so the reader can judge its weight. */
+  from: string | null;
+  to: string | null;
   goalWindows: GoalWindow[];
   result: MarketLine[];
   totals: TotalLine[];
+  /** Goals scored by each player in these encounters. */
+  playerGoals: { a: TotalLine[]; b: TotalLine[] };
   drawNoBet: MarketLine[];
   asian: AsianLine[];
   bothScore: MarketLine;
@@ -84,6 +91,7 @@ export interface H2HStats {
 }
 
 const GOAL_LINES = [2.5, 3.5, 4.5, 5.5, 6.5, 7.5];
+const PLAYER_GOAL_LINES = [0.5, 1.5, 2.5, 3.5, 4.5];
 const HALFTIME_GOAL_LINES = [0.5, 1.5, 2.5, 3.5];
 const ASIAN_LINES = [-1.5, -1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1, 1.5];
 const HALFTIME_ASIAN_LINES = [-1, -0.5, -0.25, 0, 0.25, 0.5, 1];
@@ -209,7 +217,16 @@ export function buildBaseline(
 ): PlayerBaseline {
   const n = games.length;
   if (n === 0) {
-    return { player, matches: 0, avgFor: 0, avgAgainst: 0, avgTotal: 0, winPct: 0, drawPct: 0 };
+    return {
+      player,
+      matches: 0,
+      avgFor: 0,
+      avgAgainst: 0,
+      avgTotal: 0,
+      winPct: 0,
+      drawPct: 0,
+      goals: [],
+    };
   }
 
   const goalsFor = games.reduce((sum, g) => sum + g.for, 0);
@@ -223,6 +240,10 @@ export function buildBaseline(
     avgTotal: round((goalsFor + goalsAgainst) / n, 2),
     winPct: round((games.filter((g) => g.for > g.against).length / n) * 100, 1),
     drawPct: round((games.filter((g) => g.for === g.against).length / n) * 100, 1),
+    goals: totalsFor(
+      games.map((g) => g.for),
+      PLAYER_GOAL_LINES,
+    ),
   };
 }
 
@@ -272,6 +293,8 @@ export function buildStats(
 
   return {
     sample,
+    from: matches.length ? matches[matches.length - 1].playedAt : null,
+    to: matches.length ? matches[0].playedAt : null,
     goalWindows,
     result: [
       line(playerA, winsA, sample),
@@ -282,6 +305,16 @@ export function buildStats(
       matches.map((m) => m.scoreA + m.scoreB),
       GOAL_LINES,
     ),
+    playerGoals: {
+      a: totalsFor(
+        matches.map((m) => m.scoreA),
+        PLAYER_GOAL_LINES,
+      ),
+      b: totalsFor(
+        matches.map((m) => m.scoreB),
+        PLAYER_GOAL_LINES,
+      ),
+    },
     drawNoBet: [line(playerA, winsA, decided), line(playerB, winsB, decided)],
     asian: ASIAN_LINES.map((h) => asianLine(margins, h)),
     bothScore: line(

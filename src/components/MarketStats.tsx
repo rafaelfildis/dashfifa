@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AsianLine, GoalWindow, H2HStats, MarketLine, PlayerBaseline } from '../types';
+import type { AsianLine, GoalWindow, H2HStats, MarketLine, PlayerBaseline, TotalLine } from '../types';
 
 const SMALL_SAMPLE = 10;
 
@@ -32,6 +32,38 @@ function fromAsian(key: string, l: AsianLine): Pick {
 
 function windowLabel(w: GoalWindow) {
   return w.window === null ? `Todos (${w.matches})` : `Últimos ${w.window}`;
+}
+
+function shortDate(iso: string) {
+  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+/**
+ * Both sides of a goal market in one card, the way the bookmaker lists them.
+ * `reference` carries the same lines over a wider sample, shown on hover.
+ */
+function fromTotals(key: string, totals: TotalLine[], reference?: TotalLine[]): Pick[] {
+  const detailFor = (line: number, side: 'over' | 'under') => {
+    const ref = reference?.find((r) => r.line === line);
+    return ref ? `Na liga inteira: ${ref[side].pct.toFixed(1)}%` : undefined;
+  };
+
+  return [
+    ...totals.map((t) => ({
+      key: `${key}-o-${t.line}`,
+      label: t.over.label,
+      pct: t.over.pct,
+      fairOdds: t.over.fairOdds,
+      detail: detailFor(t.line, 'over'),
+    })),
+    ...totals.map((t) => ({
+      key: `${key}-u-${t.line}`,
+      label: t.under.label,
+      pct: t.under.pct,
+      fairOdds: t.under.fairOdds,
+      detail: detailFor(t.line, 'under'),
+    })),
+  ];
 }
 
 interface RowProps {
@@ -187,7 +219,10 @@ export function MarketStats({ stats }: { stats: H2HStats }) {
         <header className="markets__head">
           <h2 className="section-title">Mercados</h2>
           <div className="markets__tools">
-            <span className="markets__scope">{stats.sample} confrontos na amostra</span>
+            <span className="markets__scope">
+              {stats.sample} confrontos
+              {stats.from && stats.to && ` · ${shortDate(stats.from)} a ${shortDate(stats.to)}`}
+            </span>
             <button
               className={`toggle${comparing ? ' toggle--on' : ''}`}
               onClick={() => setComparing((v) => !v)}
@@ -235,15 +270,19 @@ export function MarketStats({ stats }: { stats: H2HStats }) {
             {...shared}
           />
 
+          <Card title="Total de gols" wide picks={fromTotals('tot', stats.totals)} {...shared} />
+
           <Card
-            title="Total de gols · Mais de"
-            picks={stats.totals.map((t) => fromLine(`o-${t.line}`, t.over))}
+            title={`Gols de ${stats.result[0].label}`}
+            note={stats.baseline ? `${stats.baseline.a.avgFor.toFixed(2)} por jogo na liga` : undefined}
+            picks={fromTotals('pga', stats.playerGoals.a, stats.baseline?.a.goals)}
             {...shared}
           />
 
           <Card
-            title="Total de gols · Menos de"
-            picks={stats.totals.map((t) => fromLine(`u-${t.line}`, t.under))}
+            title={`Gols de ${stats.result[2].label}`}
+            note={stats.baseline ? `${stats.baseline.b.avgFor.toFixed(2)} por jogo na liga` : undefined}
+            picks={fromTotals('pgb', stats.playerGoals.b, stats.baseline?.b.goals)}
             {...shared}
           />
 
@@ -257,13 +296,9 @@ export function MarketStats({ stats }: { stats: H2HStats }) {
                 {...shared}
               />
               <Card
-                title="1º tempo · Mais de"
-                picks={stats.halftime.totals.map((t) => fromLine(`ho-${t.line}`, t.over))}
-                {...shared}
-              />
-              <Card
-                title="1º tempo · Menos de"
-                picks={stats.halftime.totals.map((t) => fromLine(`hu-${t.line}`, t.under))}
+                title="1º tempo · total de gols"
+                wide
+                picks={fromTotals('ht', stats.halftime.totals)}
                 {...shared}
               />
             </>

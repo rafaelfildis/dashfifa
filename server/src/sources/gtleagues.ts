@@ -86,8 +86,7 @@ export function fetchGtLeaguesLive(): Promise<Match[]> {
   return fetchRange(from, to, 2);
 }
 
-export function fetchGtLeaguesHistory(days: number): Promise<Match[]> {
-  const to = new Date().toISOString();
-  const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-  return fetchRange(from, to, 30);
+/** One calendar day (UTC) - the unit of work for the backfill. */
+export function fetchGtLeaguesDay(date: string): Promise<Match[]> {
+  return fetchRange(`${date}T00:00:00.000Z`, `${date}T23:59:59.999Z`, 12);
 }

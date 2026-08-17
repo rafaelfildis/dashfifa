@@ -34,6 +34,7 @@ listam para estas ligas:
 | Empate anula | vitórias desconsiderando empates (handicap 0.0) |
 | Handicap asiático | linhas de -1.5 a +1.5, incluindo quartos |
 | Total de gols | "mais de" e "menos de", linhas de 2.5 a 7.5 |
+| Gols de cada jogador | "mais de" e "menos de", linhas de 0.5 a 4.5 |
 | 1º tempo | handicap e total de gols no intervalo |
 | Ambas marcam | frequência de os dois marcarem |
 
@@ -70,9 +71,16 @@ direto entre dois jogadores arbitrários — isso é calculado aqui.
 
 ### Histórico
 
-Na subida, o servidor faz backfill dos últimos 4 dias de cada fonte e grava em
-`server/data/history.json` (ignorado pelo git). O backfill se repete a cada 10
-minutos, e o arquivo é recarregado em reinícios, então os confrontos não somem.
+O servidor mantém uma janela de **45 dias** de cada fonte (`HISTORY_DAYS` para
+mudar) em `server/data/history.json`, ignorado pelo git. São cerca de 80 mil
+partidas, o que dá dezenas a centenas de confrontos por par de jogadores — o
+suficiente para as frequências pararem de oscilar.
+
+O backfill é **incremental**: cada dia e cada torneio já baixado por inteiro
+fica marcado como concluído e não é buscado de novo. Só as últimas 36 horas são
+sempre relidas, porque ainda há partidas terminando. Na prática, a primeira
+carga leva alguns minutos e as seguintes, menos de um minuto. As estatísticas
+usam todos os confrontos da janela, não uma amostra recente.
 
 Cada fonte tem um caminho próprio para histórico:
 

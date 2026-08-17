@@ -55,6 +55,7 @@ interface RawLocation {
 interface RawTournamentSummary {
   id: number;
   token_international: string;
+  start_date: string;
   league: { token_international: string };
 }
 
@@ -106,40 +107,51 @@ export async function fetchEsportsBattleLive(): Promise<Match[]> {
   return matches;
 }
 
-/** Finished matches from every tournament that ran in the last `days` days. */
-export async function fetchEsportsBattleHistory(days: number): Promise<Match[]> {
-  const dateFrom = isoDate(days);
-  const dateTo = isoDate(-1); // tomorrow, so today's tournaments are included
+export interface TournamentRef {
+  id: number;
+  leagueId: LeagueId;
+  startDate: string;
+}
+
+function nextDay(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Tournaments that ran on one day. Listing per day (rather than over the whole
+ * window) lets the backfill cache the listing itself, so later runs only ask
+ * about days they have never seen.
+ */
+export async function listEsportsBattleTournamentsForDay(date: string): Promise<TournamentRef[]> {
+  const range = `dateFrom=${date}&dateTo=${nextDay(date)}`;
 
   const first = await get<{ totalPages: number; tournaments: RawTournamentSummary[] }>(
-    `/tournaments?page=1&dateFrom=${dateFrom}&dateTo=${dateTo}`,
+    `/tournaments?page=1&${range}`,
     20_000,
   );
 
   const pages = Array.from({ length: Math.max(0, first.totalPages - 1) }, (_, i) => i + 2);
   const rest = await mapLimit(pages, 3, (page) =>
-    get<{ tournaments: RawTournamentSummary[] }>(
-      `/tournaments?page=${page}&dateFrom=${dateFrom}&dateTo=${dateTo}`,
-      20_000,
-    )
+    get<{ tournaments: RawTournamentSummary[] }>(`/tournaments?page=${page}&${range}`, 20_000)
       .then((r) => r.tournaments)
       .catch(() => [] as RawTournamentSummary[]),
   );
 
-  const tournaments = [...first.tournaments, ...rest.flat()];
+  return [...first.tournaments, ...rest.flat()].map((t) => ({
+    id: t.id,
+    leagueId: leagueIdForLeagueName(t.league.token_international),
+    startDate: t.start_date,
+  }));
+}
 
-  const perTournament = await mapLimit(tournaments, 5, async (t) => {
-    const leagueId = leagueIdForLeagueName(t.league.token_international);
-    const raws = await get<RawMatch[]>(`/tournaments/${t.id}/matches`, 20_000).catch(
-      () => [] as RawMatch[],
-    );
-    return raws
-      .map((raw) => {
-        const status = mapStatus(raw.status_id);
-        return status ? toMatch(raw, leagueId, status) : null;
-      })
-      .filter((m): m is Match => m !== null);
-  });
-
-  return perTournament.flat();
+export async function fetchEsportsBattleTournament(ref: TournamentRef): Promise<Match[]> {
+  const raws = await get<RawMatch[]>(`/tournaments/${ref.id}/matches`, 20_000);
+  return raws
+    .map((raw) => {
+      const status = mapStatus(raw.status_id);
+      return status ? toMatch(raw, ref.leagueId, status) : null;
+    })
+    .filter((m): m is Match => m !== null);
 }

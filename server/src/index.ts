@@ -187,8 +187,9 @@ app.get('/api/h2h', (req, res) => {
   });
 });
 
-app.get('/api/refresh', async (_req, res) => {
-  await backfillHistory();
+// Kicks the backfill off without holding the request open; poll /api/status.
+app.get('/api/refresh', (_req, res) => {
+  void backfillHistory();
   res.json(historyStatus());
 });
 
