@@ -13,6 +13,8 @@ export interface MatchSide {
   player: string;
   team: string;
   score: number | null;
+  /** Score at the interval. Only ESportsBattle reports it. */
+  halftime?: number | null;
 }
 
 export interface Match {

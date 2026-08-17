@@ -19,8 +19,29 @@ jogadores e, opcionalmente, o time de cada um:
   qualquer time;
 - **escolhendo os times** — mostra só os confrontos naquela combinação de times.
 
-O agregado (vitórias, empates, gols) sempre considera todos os confrontos
-encontrados, não apenas os 10 exibidos.
+A lista mostra os últimos 15 confrontos. O agregado sempre considera **todos** os
+confrontos encontrados, não apenas os exibidos.
+
+### Estatísticas
+
+Acima da lista ficam a média de gols por confronto (janelas de 5, 10, 15 e todos)
+e um painel de mercados, montado a partir dos mesmos mercados que as casas
+listam para estas ligas:
+
+| Bloco | O que mostra |
+| --- | --- |
+| Resultado final | frequência de vitória de cada um e de empate (1X2) |
+| Empate anula | vitórias desconsiderando empates (handicap asiático 0.0) |
+| Total de gols | frequência de "mais de" 2.5 a 7.5 |
+| 1º tempo | média de gols e "mais de" 1.5 / 2.5 no intervalo |
+| Ambas marcam | frequência de os dois marcarem |
+
+Cada linha traz a frequência observada e a **odd justa** (1 ÷ frequência, sem
+margem da casa). São frequências históricas daquele confronto, não previsões —
+quando a amostra tem menos de 10 jogos, a interface avisa.
+
+O bloco de 1º tempo só aparece em Battle e Battle Volta: o ESportsBattle publica
+o placar do intervalo (`prevPeriodsScores`), GT Leagues e H2H GG não.
 
 ## Arquitetura
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchH2H, fetchPlayers, fetchTeams } from '../lib/api';
+import { MarketStats } from './MarketStats';
 import type { H2HResult, League, NamedCount } from '../types';
 
 function formatDate(iso: string) {
@@ -210,10 +211,14 @@ export function H2HPage({ league, onBack }: { league: League; onBack: () => void
             )}
           </div>
 
+          {result && !sameSelection && result.stats.sample > 0 && (
+            <MarketStats stats={result.stats} />
+          )}
+
           {result && !sameSelection && (
             <div className="encounters">
               <div className="encounters__head">
-                <h2 className="encounters__title">
+                <h2 className="encounters__title section-title">
                   {result.matches.length > 0
                     ? `Últimos ${result.matches.length} confrontos`
                     : 'Confrontos'}

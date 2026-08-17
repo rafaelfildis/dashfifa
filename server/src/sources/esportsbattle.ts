@@ -28,6 +28,8 @@ interface RawParticipant {
   nickname: string;
   score?: number | null;
   team: RawTeam;
+  /** Score at the end of each finished period; index 0 is half time. */
+  prevPeriodsScores?: string[] | string | null;
 }
 
 interface RawMatch {
@@ -56,6 +58,13 @@ interface RawTournamentSummary {
   league: { token_international: string };
 }
 
+function halftimeOf(participant: RawParticipant): number | null {
+  const periods = participant.prevPeriodsScores;
+  if (!Array.isArray(periods) || periods.length === 0) return null;
+  const first = Number(periods[0]);
+  return Number.isFinite(first) ? first : null;
+}
+
 function toMatch(raw: RawMatch, leagueId: LeagueId, status: MatchStatus): Match {
   return {
     id: `eb-${raw.id}`,
@@ -66,11 +75,13 @@ function toMatch(raw: RawMatch, leagueId: LeagueId, status: MatchStatus): Match 
       player: raw.participant1.nickname,
       team: raw.participant1.team.token_international,
       score: raw.participant1.score ?? null,
+      halftime: halftimeOf(raw.participant1),
     },
     away: {
       player: raw.participant2.nickname,
       team: raw.participant2.team.token_international,
       score: raw.participant2.score ?? null,
+      halftime: halftimeOf(raw.participant2),
     },
   };
 }

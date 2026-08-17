@@ -10,6 +10,7 @@ import {
   matchesInLeague,
   startBackgroundJobs,
 } from './store.js';
+import { buildStats, type OrientedMatch } from './stats.js';
 import type { LeagueId, Match } from './types.js';
 
 const app = express();
@@ -93,19 +94,8 @@ app.get('/api/teams', (req, res) => {
   res.json(teams);
 });
 
-interface H2HMatch {
-  id: string;
-  playedAt: string;
-  teamA: string;
-  teamB: string;
-  scoreA: number;
-  scoreB: number;
-  result: 'A' | 'B' | 'D';
-  aWasHome: boolean;
-}
-
 /** Reorients a match so side A is always the first selected player. */
-function orient(match: Match, a: string): H2HMatch {
+function orient(match: Match, a: string): OrientedMatch {
   const aWasHome = match.home.player === a;
   const sideA = aWasHome ? match.home : match.away;
   const sideB = aWasHome ? match.away : match.home;
@@ -121,6 +111,8 @@ function orient(match: Match, a: string): H2HMatch {
     scoreB,
     result: scoreA > scoreB ? 'A' : scoreB > scoreA ? 'B' : 'D',
     aWasHome,
+    htA: sideA.halftime ?? null,
+    htB: sideB.halftime ?? null,
   };
 }
 
@@ -140,7 +132,7 @@ app.get('/api/h2h', (req, res) => {
 
   const teamA = typeof req.query.teamA === 'string' && req.query.teamA ? req.query.teamA : null;
   const teamB = typeof req.query.teamB === 'string' && req.query.teamB ? req.query.teamB : null;
-  const limit = Math.min(Number(req.query.limit) || 10, 50);
+  const limit = Math.min(Number(req.query.limit) || 15, 50);
 
   const encounters = finishedInLeague(league)
     .filter((m) => {
@@ -174,6 +166,7 @@ app.get('/api/h2h', (req, res) => {
     played: encounters.length,
     ...totals,
     matches: recent,
+    stats: buildStats(encounters, a, b),
   });
 });
 

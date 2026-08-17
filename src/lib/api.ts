@@ -33,7 +33,7 @@ export function fetchH2H(
   teamA: string,
   teamB: string,
 ): Promise<H2HResult> {
-  const params = new URLSearchParams({ league, a, b, limit: '10' });
+  const params = new URLSearchParams({ league, a, b, limit: '15' });
   if (teamA) params.set('teamA', teamA);
   if (teamB) params.set('teamB', teamB);
   return get<H2HResult>(`/api/h2h?${params}`);

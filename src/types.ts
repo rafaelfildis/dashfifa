@@ -25,6 +25,31 @@ export interface H2HMatch {
   aWasHome: boolean;
 }
 
+export interface MarketLine {
+  label: string;
+  hits: number;
+  pct: number;
+  fairOdds: number | null;
+}
+
+export interface GoalWindow {
+  window: number | null;
+  matches: number;
+  avgTotal: number;
+  avgA: number;
+  avgB: number;
+}
+
+export interface H2HStats {
+  sample: number;
+  goalWindows: GoalWindow[];
+  result: MarketLine[];
+  overUnder: MarketLine[];
+  drawNoBet: MarketLine[];
+  bothScore: MarketLine;
+  halftime: { sample: number; avgTotal: number; lines: MarketLine[] } | null;
+}
+
 export interface H2HResult {
   league: LeagueId;
   playerA: string;
@@ -38,6 +63,7 @@ export interface H2HResult {
   goalsA: number;
   goalsB: number;
   matches: H2HMatch[];
+  stats: H2HStats;
 }
 
 export interface HistoryStatus {
