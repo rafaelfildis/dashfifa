@@ -1,30 +1,82 @@
 :root {
-  /* A pitch under floodlights: deep desaturated turf, chalk markings, two kits. */
-  --pitch-deep: #08110e;
-  --pitch: #0e1c17;
-  --pitch-raised: #142621;
-  --chalk: #f0f4ec;
-  --chalk-dim: #7e9187;
-  --chalk-line: rgba(240, 244, 236, 0.14);
-  --kit-home: #5cc8f5;
-  --kit-away: #ff7a52;
-  --floodlight: #ffd24d;
+  /* Design tokens do redesign da H2H: um fundo quase preto, uma única superfície
+     de card, e duas cores de jogador que nunca se misturam. A separação entre
+     card e fundo vem de borda, nunca de sombra. */
+  --bg: #0a0c0e;
+  --surface: #101317;
+  --control: #161b21;
+  --control-deep: #0e1216;
+  --chip: #15191e;
+  --chip-hover: #1b2028;
+  --pill-active: #191e25;
+  --pill-hover: #14181d;
+  --raise: #1d232b;
 
-  --display: 'Archivo', 'Arial Black', system-ui, sans-serif;
-  --body: 'IBM Plex Sans', system-ui, 'Segoe UI', sans-serif;
-  --data: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-soft: rgba(255, 255, 255, 0.06);
+  --line-inner: rgba(255, 255, 255, 0.05);
+  --line-faint: rgba(255, 255, 255, 0.04);
+  --row-hover: rgba(255, 255, 255, 0.02);
 
-  --gutter: clamp(16px, 4vw, 32px);
+  --text: #e7ecf2;
+  --text-2: #c7d0db;
+  --text-3: #b9c2ce;
+  --muted: #8a94a3;
+  --label: #7a8493;
+
+  --a: #4fb9e8;
+  --a-bar: rgba(79, 185, 232, 0.85);
+  --a-edge: rgba(79, 185, 232, 0.35);
+  --a-edge-hover: rgba(79, 185, 232, 0.6);
+  --a-badge: rgba(79, 185, 232, 0.12);
+
+  --b: #ff7a57;
+  --b-bar: rgba(255, 122, 87, 0.85);
+  --b-edge: rgba(255, 122, 87, 0.35);
+  --b-edge-hover: rgba(255, 122, 87, 0.6);
+  --b-badge: rgba(255, 122, 87, 0.12);
+
+  --neutral-bar: rgba(199, 208, 219, 0.55);
+  --draw-block: #3a424c;
+  --loss-block: #2a3038;
+  --track-off: #252b33;
+
+  --good: #35c58a;
+  --good-text: #4fd3a0;
+  --good-bg: rgba(53, 197, 138, 0.16);
+
+  --amber: #e8b24a;
+  --amber-bg: rgba(232, 178, 74, 0.1);
+  --amber-line: rgba(232, 178, 74, 0.22);
+  --amber-label: #c89a3c;
+
+  --bad-text: #e58080;
+  --bad-bg: rgba(224, 90, 90, 0.14);
+
+  --sans: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+
+  --gutter: 32px;
 
   color-scheme: dark;
-  font-family: var(--body);
-  font-size: 15px;
+  font-family: var(--sans);
+  font-size: 14px;
   line-height: 1.45;
-  color: var(--chalk);
-  background: var(--pitch-deep);
+  color: var(--text);
+  background: var(--bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --gutter: 18px;
+  }
+}
+
+/* Âncoras da nav interna rolam pelo próprio container, sem scrollIntoView. */
+html {
+  scroll-behavior: smooth;
 }
 
 * {
@@ -34,33 +86,53 @@
 body {
   margin: 0;
   min-height: 100svh;
-  background:
-    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(92, 200, 245, 0.07), transparent 70%),
-    var(--pitch-deep);
+  background: var(--bg);
 }
 
 h1,
 h2,
 h3 {
   margin: 0;
-  font-family: var(--display);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
+p {
+  text-wrap: pretty;
+}
+
 button,
-select {
+select,
+input {
   font: inherit;
   color: inherit;
 }
 
+a {
+  color: var(--a);
+  text-decoration: none;
+}
+
+/* Todo número é monoespaçado e tabular, para que colunas de números alinhem. */
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: rgba(79, 185, 232, 0.28);
+}
+
 :focus-visible {
-  outline: 2px solid var(--floodlight);
-  outline-offset: 3px;
-  border-radius: 4px;
+  outline: 2px solid var(--a);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {

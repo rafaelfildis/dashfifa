@@ -3,6 +3,7 @@ import './App.css';
 import { H2HPage } from './components/H2HPage';
 import { LeagueSelect } from './components/LeagueSelect';
 import { fetchLeagues, fetchSnapshotDate, usingSnapshot } from './lib/api';
+import { stamp } from './lib/format';
 import type { League } from './types';
 
 export default function App() {
@@ -32,34 +33,22 @@ export default function App() {
     };
   }, []);
 
+  // A tela de confronto traz o próprio cabeçalho sticky, então dispensa a shell.
+  if (selected) {
+    return <H2HPage league={selected} onBack={() => setSelected(null)} snapshotAt={snapshotAt} />;
+  }
+
   return (
     <div className="shell">
       <nav className="brand">
-        <button className="brand__mark" onClick={() => setSelected(null)}>
-          dashfifa
-        </button>
-        {snapshotAt && (
-          <span className="brand__stamp">
-            dados de{' '}
-            {new Date(snapshotAt).toLocaleString('pt-BR', {
-              day: '2-digit',
-              month: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </span>
-        )}
+        <span className="brand__mark">dashfifa</span>
+        {snapshotAt && <span className="brand__stamp num">dados de {stamp(snapshotAt)}</span>}
       </nav>
 
       <main className="shell__main">
         {error && <p className="notice notice--warn">{error}</p>}
         {!error && leagues.length === 0 && <p className="notice">Carregando ligas…</p>}
-
-        {selected ? (
-          <H2HPage league={selected} onBack={() => setSelected(null)} />
-        ) : (
-          leagues.length > 0 && <LeagueSelect leagues={leagues} onPick={setSelected} />
-        )}
+        {leagues.length > 0 && <LeagueSelect leagues={leagues} onPick={setSelected} />}
       </main>
     </div>
   );

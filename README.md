@@ -15,32 +15,40 @@ partidas de quatro ligas:
 A tela inicial mostra as quatro ligas. Ao escolher uma, você seleciona dois
 jogadores e, opcionalmente, o time de cada um:
 
-- **sem escolher os times** — mostra os últimos 10 confrontos entre os dois, com
-  qualquer time;
+- **sem escolher os times** — mostra os confrontos entre os dois com qualquer
+  time;
 - **escolhendo os times** — mostra só os confrontos naquela combinação de times.
 
-A lista mostra os últimos 15 confrontos. O agregado sempre considera **todos** os
-confrontos encontrados, não apenas os exibidos.
+Os seletores abrem um dropdown com busca e a contagem de partidas de cada
+jogador; o botão ⇄ troca os dois de lado, o que inverte a perspectiva do
+handicap e as cores de cada um. A lista de histórico mostra os últimos 15
+confrontos, mas o agregado sempre considera **todos** os confrontos
+encontrados, não apenas os exibidos.
 
-### Estatísticas
+### A página de confronto
 
-Acima da lista ficam a média de gols por confronto (janelas de 5, 10, 15 e todos)
-e um painel de mercados, montado a partir dos mesmos mercados que as casas
-listam para estas ligas:
+A leitura vai do resumo ao detalhe, em quatro níveis:
 
-| Bloco | O que mostra |
+| Seção | O que responde |
 | --- | --- |
-| Resultado final | frequência de vitória de cada um e de empate (1X2) |
-| Empate anula | vitórias desconsiderando empates (handicap 0.0) |
-| Handicap asiático | linhas de -1.5 a +1.5, incluindo quartos |
-| Total de gols | "mais de" e "menos de", linhas de 2.5 a 7.5 |
-| Gols de cada jogador | "mais de" e "menos de", linhas de 0.5 a 4.5 |
-| 1º tempo | handicap e total de gols no intervalo |
-| Ambas marcam | frequência de os dois marcarem |
+| Resumo | quem venceu quantas, média de gols, forma recente, tamanho da amostra e seis insights |
+| Performance geral na liga | o retrospecto de cada um na liga inteira, normalmente centenas de partidas |
+| Principais mercados | resultado final, empate anula, ambas marcam e a linha principal de total de gols |
+| Gols | "mais de" por linha, para o confronto e para cada jogador |
+| Handicap asiático | linhas de −1.5 a +1.5, incluindo quartos, na perspectiva do jogador A |
+| Histórico | os confrontos um a um, com filtro por resultado |
+
+O card de amostra classifica o volume de dados em cinco faixas (de "muito
+pequena" a "robusta") e diz o que isso significa para a leitura — ele
+contextualiza a quantidade de dados, não emite conclusão estatística.
 
 Cada linha traz a frequência observada e a **odd justa** (1 ÷ frequência, sem
-margem da casa). São frequências históricas daquele confronto, não previsões —
-quando a amostra tem menos de 10 jogos, a interface avisa.
+margem da casa). São frequências históricas daquele confronto, não previsões.
+Quando a frequência é zero não existe odd, e a interface mostra `—` em vez de
+um número.
+
+As linhas de "menos de" ficam atrás de um botão: são o complemento aritmético
+das de "mais de" e dobravam a densidade da tela sem acrescentar informação.
 
 **Handicap asiático.** As linhas quebradas usam a notação da própria casa
 (`+0.25` aparece como `0.0, +0.5`) e a liquidação é a real: meia-vitória e
@@ -49,15 +57,19 @@ contarem como derrota. O retrospecto completo de cada linha fica no title da
 linha.
 
 **Cada um na liga inteira.** Como o confronto direto costuma ter poucos jogos,
-o painel também traz o retrospecto de cada jogador na liga toda — normalmente
-centenas de partidas — para servir de referência quando a amostra do par é fina.
+a seção de performance traz o retrospecto de cada jogador na liga toda para
+servir de referência quando a amostra do par é fina. Ela continua visível mesmo
+quando os dois nunca se enfrentaram — é a informação útil que resta.
 
-**Comparar odds da casa.** O botão no cabeçalho revela um campo por linha: ao
-digitar a odd ofertada, o painel calcula o valor esperado (`freq × odd − 1`).
-Positivo significa que a casa está pagando acima do que o histórico sustenta.
+**Comparar odds da casa.** O botão em *Principais mercados* revela um campo por
+linha: ao digitar a odd ofertada, a página calcula o valor esperado
+(`freq × odd − 1`). Positivo significa que a casa está pagando acima do que o
+histórico sustenta.
 
-O bloco de 1º tempo só aparece em Battle e Battle Volta: o ESportsBattle publica
-o placar do intervalo (`prevPeriodsScores`), GT Leagues e H2H GG não.
+Os blocos de 1º tempo só aparecem em Battle e Battle Volta: o ESportsBattle
+publica o placar do intervalo (`prevPeriodsScores`), GT Leagues e H2H GG não.
+Nas outras duas ligas, uma linha discreta explica a ausência em vez de um card
+vazio.
 
 ## Publicação (GitHub Pages)
 
@@ -79,7 +91,11 @@ usa o snapshot. `VITE_DATA_MODE=server|static` força um dos dois.
 
 ## Arquitetura
 
-- `src/` — frontend React + TypeScript (Vite)
+- `src/` — frontend React + TypeScript (Vite). `src/components/` tem a página de
+  confronto quebrada por bloco e `src/lib/` guarda o acesso a dados, a
+  formatação pt-BR e os recortes derivados da apresentação
+- `src/App.css` — o design system da tela: tokens em `src/index.css`, e todas as
+  visualizações são divs com largura percentual (nenhuma biblioteca de gráfico)
 - `server/` — backend Express que busca, normaliza e mantém em cache o histórico
   das três plataformas
 - `shared/` — tipos, cálculo de estatísticas e do head-to-head, usados pelo

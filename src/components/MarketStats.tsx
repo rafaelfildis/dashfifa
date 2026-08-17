@@ -1,319 +1,423 @@
 import { useState } from 'react';
-import type { AsianLine, GoalWindow, H2HStats, MarketLine, PlayerBaseline, TotalLine } from '../types';
+import { decimal, minusSign, odds, pct, tally } from '../lib/format';
+import type { AsianLine, H2HResult, MarketLine, TotalLine } from '../types';
 
-const SMALL_SAMPLE = 10;
+const FAIR_ODDS_HINT =
+  'Odd calculada a partir da frequência histórica observada. Não representa garantia de ocorrência futura.';
 
-type Tone = 'a' | 'b' | 'draw';
+type Tone = 'a' | 'b' | 'neutral';
 
-/** One market outcome, normalised so every card renders the same row. */
-interface Pick {
+interface Row {
   key: string;
   label: string;
   pct: number;
   fairOdds: number | null;
-  tone?: Tone;
-  detail?: string;
+  count: string;
+  tone: Tone;
 }
 
-function fromLine(key: string, l: MarketLine, tone?: Tone): Pick {
-  return { key, label: l.label, pct: l.pct, fairOdds: l.fairOdds, tone };
-}
-
-function fromAsian(key: string, l: AsianLine): Pick {
-  const record = `${l.wins} vitórias · ${l.halfWins} meia-vitória · ${l.pushes} anuladas · ${l.halfLosses} meia-derrota · ${l.losses} derrotas`;
+function toRow(key: string, line: MarketLine, base: number, tone: Tone): Row {
   return {
-    key: `${key}-${l.line}`,
-    label: l.label,
-    pct: l.pct,
-    fairOdds: l.fairOdds,
-    detail: record,
+    key,
+    label: line.label,
+    pct: line.pct,
+    fairOdds: line.fairOdds,
+    count: tally(line.hits, base),
+    tone,
   };
 }
 
-function windowLabel(w: GoalWindow) {
-  return w.window === null ? `Todos (${w.matches})` : `Últimos ${w.window}`;
+/** Só as linhas de "mais de" por padrão: as de "menos de" são o complemento aritmético. */
+function goalRows(prefix: string, lines: TotalLine[], base: number, withUnder: boolean): Row[] {
+  const over = lines.map((t) => toRow(`${prefix}-o-${t.line}`, t.over, base, 'neutral'));
+  if (!withUnder) return over;
+  return [...over, ...lines.map((t) => toRow(`${prefix}-u-${t.line}`, t.under, base, 'neutral'))];
 }
 
-function shortDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+interface CardModel {
+  key: string;
+  title: string;
+  note: string;
+  rows: Row[];
+}
+
+interface GoalBlock extends CardModel {
+  tone: Tone;
+}
+
+interface OddsProbe {
+  comparing: boolean;
+  typed: Record<string, string>;
+  onOdd: (key: string, value: string) => void;
+}
+
+/** Valor esperado da odd ofertada contra a frequência histórica: `freq × odd − 1`. */
+function OddCheck({ row, probe }: { row: Row; probe: OddsProbe }) {
+  const value = probe.typed[row.key] ?? '';
+  const parsed = Number(value.replace(',', '.'));
+  const usable = value.trim() !== '' && Number.isFinite(parsed) && parsed > 1;
+  const edge = usable ? (row.pct / 100) * parsed - 1 : null;
+
+  return (
+    <>
+      <input
+        className="probe__input num"
+        inputMode="decimal"
+        placeholder="odd"
+        aria-label={`Odd da casa para ${row.label}`}
+        value={value}
+        onChange={(e) => probe.onOdd(row.key, e.target.value)}
+      />
+      <span className={`probe__edge num${edge !== null && edge > 0 ? ' probe__edge--up' : ''}`}>
+        {edge === null ? '—' : `${edge > 0 ? '+' : '−'}${Math.abs(edge * 100).toFixed(0)}%`}
+      </span>
+    </>
+  );
+}
+
+function MarketCard({
+  title,
+  note,
+  rows,
+  probe,
+}: {
+  title: string;
+  note: string;
+  rows: Row[];
+  probe: OddsProbe;
+}) {
+  return (
+    <div className="mcard">
+      <div className="mcard__head">
+        <span className="mcard__title">{title}</span>
+        <span className="mcard__note">{note}</span>
+      </div>
+      <div className="mcard__rows">
+        {rows.map((row) => (
+          <div key={row.key} className="mrow">
+            <div className="mrow__head">
+              <span className={`mrow__label mrow__label--${row.tone}`}>{row.label}</span>
+              <span className="mrow__figures">
+                <span className="mrow__count num">{row.count}</span>
+                <span className="mrow__pct num">{pct(row.pct)}</span>
+                <span className="mrow__odd num" title={FAIR_ODDS_HINT}>
+                  {odds(row.fairOdds)}
+                </span>
+              </span>
+            </div>
+            <div className="track track--thin">
+              <div
+                className={`track__seg track__seg--${row.tone}`}
+                style={{ width: `${row.pct}%` }}
+              />
+            </div>
+            {probe.comparing && (
+              <div className="probe">
+                <span className="probe__label">Odd da casa</span>
+                <OddCheck row={row} probe={probe} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="mcard__foot">
+        <span>Frequência</span>
+        <span className="mcard__foot-odd">Odd justa</span>
+      </div>
+    </div>
+  );
+}
+
+function GoalCard({
+  title,
+  note,
+  tone,
+  rows,
+  probe,
+}: {
+  title: string;
+  note: string;
+  tone: Tone;
+  rows: Row[];
+  probe: OddsProbe;
+}) {
+  return (
+    <div className="gcard">
+      <div className="gcard__head">
+        <span className={`gcard__title gcard__title--${tone}`}>{title}</span>
+        <span className="gcard__note num">{note}</span>
+      </div>
+      <div className="gcard__rows">
+        {rows.map((row) => (
+          <div key={row.key} className={`grow${probe.comparing ? ' grow--compare' : ''}`}>
+            <span className="grow__label">{row.label}</span>
+            <div className="track track--goal">
+              <div className={`track__seg track__seg--${tone}`} style={{ width: `${row.pct}%` }} />
+            </div>
+            <span className={`grow__pct num${row.pct === 0 ? ' grow__pct--zero' : ''}`}>
+              {pct(row.pct)}
+            </span>
+            <span className="grow__count num">{row.count}</span>
+            <span className="grow__odd num" title={FAIR_ODDS_HINT}>
+              {odds(row.fairOdds)}
+            </span>
+            {probe.comparing && <OddCheck row={row} probe={probe} />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function asianTitle(line: AsianLine): string {
+  return `${line.wins} vitórias · ${line.halfWins} meia-vitória · ${line.pushes} anuladas · ${line.halfLosses} meia-derrota · ${line.losses} derrotas`;
+}
+
+function HandicapTable({
+  lines,
+  prefix,
+  sample,
+  probe,
+}: {
+  lines: AsianLine[];
+  prefix: string;
+  sample: number;
+  probe: OddsProbe;
+}) {
+  const wide = probe.comparing ? ' hcap__row--compare' : '';
+
+  return (
+    <div className="hcap">
+      <div className={`hcap__row hcap__row--head${wide}`}>
+        <span>Linha</span>
+        <span>Distribuição</span>
+        <span className="hcap__right">Frequência</span>
+        <span className="hcap__right">Odd justa</span>
+        {probe.comparing && <span className="hcap__right">Odd da casa</span>}
+        {probe.comparing && <span className="hcap__right">Valor</span>}
+      </div>
+      {lines.map((line) => {
+        const row: Row = {
+          key: `${prefix}-${line.line}`,
+          label: line.label,
+          pct: line.pct,
+          fairOdds: line.fairOdds,
+          count: '',
+          tone: 'a',
+        };
+        return (
+          <div key={row.key} className={`hcap__row${wide}`} title={asianTitle(line)}>
+            <span
+              className={`hcap__line num${line.pct === 0 ? ' hcap__line--zero' : ''}${
+                line.line === 0 ? ' hcap__line--level' : ''
+              }`}
+            >
+              {minusSign(line.label)}
+            </span>
+            <div className="track track--goal">
+              <div className="track__seg track__seg--hcap" style={{ width: `${line.pct}%` }} />
+            </div>
+            <span className="hcap__pct num">{pct(line.pct)}</span>
+            <span className="hcap__odd num" title={FAIR_ODDS_HINT}>
+              {odds(line.fairOdds)}
+            </span>
+            {probe.comparing && <OddCheck row={row} probe={probe} />}
+          </div>
+        );
+      })}
+      <p className="hcap__foot">
+        Meia-vitória e meia-derrota contam metade; linhas anuladas ficam fora do cálculo. Por isso
+        algumas linhas têm base menor que {sample} partidas.
+      </p>
+    </div>
+  );
 }
 
 /**
- * Both sides of a goal market in one card, the way the bookmaker lists them.
- * `reference` carries the same lines over a wider sample, shown on hover.
+ * Mercados, gols e handicap. Os números vêm prontos de `shared/stats`; aqui só
+ * se decide o que aparece e em que ordem.
  */
-function fromTotals(key: string, totals: TotalLine[], reference?: TotalLine[]): Pick[] {
-  const detailFor = (line: number, side: 'over' | 'under') => {
-    const ref = reference?.find((r) => r.line === line);
-    return ref ? `Na liga inteira: ${ref[side].pct.toFixed(1)}%` : undefined;
+export function MarketStats({ result }: { result: H2HResult }) {
+  const [comparing, setComparing] = useState(false);
+  const [showUnder, setShowUnder] = useState(false);
+  const [typed, setTyped] = useState<Record<string, string>>({});
+
+  const { stats, playerA, playerB } = result;
+  const sample = stats.sample;
+  const probe: OddsProbe = {
+    comparing,
+    typed,
+    onOdd: (key, value) => setTyped((prev) => ({ ...prev, [key]: value })),
   };
 
-  return [
-    ...totals.map((t) => ({
-      key: `${key}-o-${t.line}`,
-      label: t.over.label,
-      pct: t.over.pct,
-      fairOdds: t.over.fairOdds,
-      detail: detailFor(t.line, 'over'),
-    })),
-    ...totals.map((t) => ({
-      key: `${key}-u-${t.line}`,
-      label: t.under.label,
-      pct: t.under.pct,
-      fairOdds: t.under.fairOdds,
-      detail: detailFor(t.line, 'under'),
-    })),
+  const decided = stats.result[0].hits + stats.result[2].hits;
+  const all = stats.goalWindows.find((w) => w.window === null) ?? null;
+  const over25 = stats.totals.find((t) => t.line === 2.5) ?? null;
+
+  const mainMarkets: CardModel[] = [
+    {
+      key: 'res',
+      title: 'Resultado final',
+      note: `${sample} confrontos`,
+      rows: [
+        toRow('res-a', stats.result[0], sample, 'a'),
+        toRow('res-d', stats.result[1], sample, 'neutral'),
+        toRow('res-b', stats.result[2], sample, 'b'),
+      ],
+    },
+    {
+      key: 'dnb',
+      title: 'Empate anula',
+      note: 'handicap 0.0',
+      rows: [
+        toRow('dnb-a', stats.drawNoBet[0], decided, 'a'),
+        toRow('dnb-b', stats.drawNoBet[1], decided, 'b'),
+      ],
+    },
+    {
+      key: 'btts',
+      title: 'Ambas marcam',
+      note: `${sample} confrontos`,
+      rows: [{ ...toRow('btts', stats.bothScore, sample, 'neutral'), label: 'Sim' }],
+    },
   ];
-}
 
-interface RowProps {
-  pick: Pick;
-  comparing: boolean;
-  odd: string;
-  onOdd: (key: string, value: string) => void;
-}
+  if (over25) {
+    mainMarkets.push({
+      key: 'tot',
+      title: 'Total de gols',
+      note: 'linha principal',
+      rows: [toRow('tot-main', over25.over, sample, 'neutral')],
+    });
+  }
 
-// Defined at module scope: nesting these inside MarketStats would give React a
-// new component type on every keystroke and remount the inputs mid-typing.
-function Row({ pick, comparing, odd, onOdd }: RowProps) {
-  const typed = Number(odd.replace(',', '.'));
-  const hasOdd = odd.trim() !== '' && Number.isFinite(typed) && typed > 1;
-  const edge = hasOdd ? (pick.pct / 100) * typed - 1 : null;
+  const goalBlocks: GoalBlock[] = [
+    {
+      key: 'tot',
+      title: 'Total de gols no confronto',
+      tone: 'neutral',
+      note: all ? `média ${decimal(all.avgTotal)}` : '',
+      rows: goalRows('tot', stats.totals, sample, showUnder),
+    },
+    {
+      key: 'pga',
+      title: `Gols de ${playerA}`,
+      tone: 'a',
+      note: stats.baseline ? `${decimal(stats.baseline.a.avgFor)} na liga` : '',
+      rows: goalRows('pga', stats.playerGoals.a, sample, showUnder),
+    },
+    {
+      key: 'pgb',
+      title: `Gols de ${playerB}`,
+      tone: 'b',
+      note: stats.baseline ? `${decimal(stats.baseline.b.avgFor)} na liga` : '',
+      rows: goalRows('pgb', stats.playerGoals.b, sample, showUnder),
+    },
+  ];
 
-  return (
-    <li className={`mkt__row${pick.tone ? ` mkt__row--${pick.tone}` : ''}`} title={pick.detail}>
-      <span className="mkt__fill" style={{ width: `${pick.pct}%` }} aria-hidden="true" />
-      <span className="mkt__label">{pick.label}</span>
-      <span className="mkt__pct">{pick.pct.toFixed(1)}%</span>
-      <span className="mkt__odd">{pick.fairOdds ? pick.fairOdds.toFixed(2) : '—'}</span>
-      {comparing && (
-        <>
-          <input
-            className="mkt__input"
-            inputMode="decimal"
-            placeholder="—"
-            value={odd}
-            onChange={(e) => onOdd(pick.key, e.target.value)}
-            aria-label={`Odd da casa para ${pick.label}`}
-          />
-          <span
-            className={`mkt__edge${
-              edge === null ? '' : edge > 0 ? ' mkt__edge--up' : ' mkt__edge--down'
-            }`}
-          >
-            {edge === null ? '' : `${edge > 0 ? '+' : ''}${(edge * 100).toFixed(0)}%`}
-          </span>
-        </>
-      )}
-    </li>
-  );
-}
-
-interface CardProps {
-  title: string;
-  note?: string;
-  picks?: Pick[];
-  wide?: boolean;
-  empty?: string;
-  comparing: boolean;
-  odds: Record<string, string>;
-  onOdd: (key: string, value: string) => void;
-}
-
-function Card({ title, note, picks, wide, empty, comparing, odds, onOdd }: CardProps) {
-  return (
-    <section className={`mkt${wide ? ' mkt--wide' : ''}`}>
-      <header className="mkt__head">
-        <h3 className="mkt__title">{title}</h3>
-        {note && <span className="mkt__note">{note}</span>}
-      </header>
-      {empty ? (
-        <p className="mkt__empty">{empty}</p>
-      ) : (
-        <>
-          <div className="mkt__cols">
-            <span>Freq.</span>
-            <span>Justa</span>
-            {comparing && <span>Casa</span>}
-            {comparing && <span>Valor</span>}
-          </div>
-          <ul className="mkt__rows">
-            {picks?.map((p) => (
-              <Row key={p.key} pick={p} comparing={comparing} odd={odds[p.key] ?? ''} onOdd={onOdd} />
-            ))}
-          </ul>
-        </>
-      )}
-    </section>
-  );
-}
-
-function BaselineRow({ b, tone }: { b: PlayerBaseline; tone: 'a' | 'b' }) {
-  return (
-    <li className={`base__row base__row--${tone}`}>
-      <span className="base__name">{b.player}</span>
-      <span className="base__stat">
-        <b>{b.matches}</b> jogos
-      </span>
-      <span className="base__stat">
-        marca <b>{b.avgFor.toFixed(2)}</b>
-      </span>
-      <span className="base__stat">
-        sofre <b>{b.avgAgainst.toFixed(2)}</b>
-      </span>
-      <span className="base__stat">
-        vence <b>{b.winPct.toFixed(1)}%</b>
-      </span>
-      <span className="base__stat">
-        empata <b>{b.drawPct.toFixed(1)}%</b>
-      </span>
-    </li>
-  );
-}
-
-export function MarketStats({ stats }: { stats: H2HStats }) {
-  const [comparing, setComparing] = useState(false);
-  const [odds, setOdds] = useState<Record<string, string>>({});
-
-  if (stats.sample === 0) return null;
-
-  const small = stats.sample < SMALL_SAMPLE;
-  const onOdd = (key: string, value: string) => setOdds((prev) => ({ ...prev, [key]: value }));
-  const shared = { comparing, odds, onOdd };
+  if (stats.halftime) {
+    goalBlocks.push({
+      key: 'ht',
+      title: '1º tempo · total de gols',
+      tone: 'neutral',
+      note: `média ${decimal(stats.halftime.avgTotal)}`,
+      rows: goalRows('ht', stats.halftime.totals, stats.halftime.sample, showUnder),
+    });
+  }
 
   return (
-    <div className="stats">
-      <section className="goals">
-        <header className="goals__head">
-          <h2 className="section-title">Média de gols por confronto</h2>
-        </header>
-        <ul className="goals__grid">
-          {stats.goalWindows.map((w) => (
-            <li key={w.window ?? 'all'} className="goals__cell">
-              <span className="goals__window">{windowLabel(w)}</span>
-              <span className="goals__total">{w.avgTotal.toFixed(2)}</span>
-              <span className="goals__split">
-                <b className="goals__a">{w.avgA.toFixed(1)}</b>
-                <i>·</i>
-                <b className="goals__b">{w.avgB.toFixed(1)}</b>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {stats.baseline && (
-        <section className="base">
-          <header className="goals__head">
-            <h2 className="section-title">Cada um na liga inteira</h2>
-            <span className="markets__scope">amostra maior que a do confronto direto</span>
-          </header>
-          <ul className="base__list">
-            <BaselineRow b={stats.baseline.a} tone="a" />
-            <BaselineRow b={stats.baseline.b} tone="b" />
-          </ul>
-        </section>
-      )}
-
-      <section className="markets">
-        <header className="markets__head">
-          <h2 className="section-title">Mercados</h2>
-          <div className="markets__tools">
-            <span className="markets__scope">
-              {stats.sample} confrontos
-              {stats.from && stats.to && ` · ${shortDate(stats.from)} a ${shortDate(stats.to)}`}
-            </span>
+    <>
+      <section className="section" id="mercados" aria-label="Principais mercados">
+        <div className="sechead">
+          <h2 className="sechead__title">Principais mercados</h2>
+          <div className="sechead__tools">
+            <span className="sechead__note">frequência observada em {sample} confrontos diretos</span>
             <button
-              className={`toggle${comparing ? ' toggle--on' : ''}`}
+              type="button"
+              className={`pill${comparing ? ' pill--on' : ''}`}
               onClick={() => setComparing((v) => !v)}
             >
               {comparing ? 'Ocultar odds da casa' : 'Comparar odds da casa'}
             </button>
           </div>
-        </header>
-
-        {small && (
-          <p className="notice notice--warn">
-            Amostra pequena: {stats.sample} confrontos. As frequências ainda oscilam muito — use a
-            base da liga acima como referência.
+        </div>
+        <div className={`markets${comparing ? ' markets--compare' : ''}`}>
+          {mainMarkets.map((card) => (
+            <MarketCard
+              key={card.key}
+              title={card.title}
+              note={card.note}
+              rows={card.rows}
+              probe={probe}
+            />
+          ))}
+        </div>
+        {comparing && (
+          <p className="section__foot">
+            Valor positivo quer dizer que a casa está pagando acima do que o histórico sustenta.
           </p>
         )}
-
-        <div className={`markets__grid${comparing ? ' markets__grid--compare' : ''}`}>
-          <Card
-            title="Resultado final"
-            picks={[
-              fromLine('r-a', stats.result[0], 'a'),
-              fromLine('r-d', stats.result[1], 'draw'),
-              fromLine('r-b', stats.result[2], 'b'),
-            ]}
-            {...shared}
-          />
-
-          <Card
-            title="Empate anula"
-            note="handicap 0.0"
-            picks={[
-              fromLine('d-a', stats.drawNoBet[0], 'a'),
-              fromLine('d-b', stats.drawNoBet[1], 'b'),
-            ]}
-            {...shared}
-          />
-
-          <Card title="Ambas marcam" picks={[fromLine('btts', stats.bothScore)]} {...shared} />
-
-          <Card
-            title="Handicap asiático"
-            note={`linhas para ${stats.result[0].label}`}
-            wide
-            picks={stats.asian.map((l) => fromAsian('ah', l))}
-            {...shared}
-          />
-
-          <Card title="Total de gols" wide picks={fromTotals('tot', stats.totals)} {...shared} />
-
-          <Card
-            title={`Gols de ${stats.result[0].label}`}
-            note={stats.baseline ? `${stats.baseline.a.avgFor.toFixed(2)} por jogo na liga` : undefined}
-            picks={fromTotals('pga', stats.playerGoals.a, stats.baseline?.a.goals)}
-            {...shared}
-          />
-
-          <Card
-            title={`Gols de ${stats.result[2].label}`}
-            note={stats.baseline ? `${stats.baseline.b.avgFor.toFixed(2)} por jogo na liga` : undefined}
-            picks={fromTotals('pgb', stats.playerGoals.b, stats.baseline?.b.goals)}
-            {...shared}
-          />
-
-          {stats.halftime ? (
-            <>
-              <Card
-                title="1º tempo · handicap"
-                note={`média ${stats.halftime.avgTotal.toFixed(2)} gols`}
-                wide
-                picks={stats.halftime.asian.map((l) => fromAsian('hah', l))}
-                {...shared}
-              />
-              <Card
-                title="1º tempo · total de gols"
-                wide
-                picks={fromTotals('ht', stats.halftime.totals)}
-                {...shared}
-              />
-            </>
-          ) : (
-            <Card title="1º tempo" empty="Esta liga não publica o placar do intervalo." {...shared} />
-          )}
-        </div>
-
-        <p className="markets__caption">
-          Freq. é o que aconteceu nestes confrontos, não uma previsão. A odd justa é 1 ÷ freq., sem
-          a margem da casa. No handicap asiático, meia-vitória e meia-derrota contam metade e as
-          linhas anuladas ficam de fora — passe o mouse na linha para ver o retrospecto.
-          {comparing && ' Valor positivo quer dizer que a odd da casa paga acima do histórico.'}
-        </p>
       </section>
-    </div>
+
+      <section className="section" id="gols" aria-label="Gols">
+        <div className="sechead">
+          <h2 className="sechead__title">Gols</h2>
+          <div className="sechead__tools">
+            <span className="sechead__note">
+              {showUnder ? 'linhas de "mais de" e "menos de"' : 'somente linhas de "mais de"'}
+            </span>
+            <button
+              type="button"
+              className={`pill${showUnder ? ' pill--on' : ''}`}
+              onClick={() => setShowUnder((v) => !v)}
+            >
+              {showUnder ? 'Ocultar "menos de"' : 'Mostrar "menos de"'}
+            </button>
+          </div>
+        </div>
+        <div className={`goals${comparing ? ' goals--compare' : ''}`}>
+          {goalBlocks.map((block) => (
+            <GoalCard
+              key={block.key}
+              title={block.title}
+              note={block.note}
+              tone={block.tone}
+              rows={block.rows}
+              probe={probe}
+            />
+          ))}
+        </div>
+        {!stats.halftime && (
+          <p className="section__foot">
+            Esta liga não publica o placar do intervalo, por isso não há dados de 1º tempo.
+          </p>
+        )}
+      </section>
+
+      <section className="section" id="handicap" aria-label="Handicap asiático">
+        <div className="sechead">
+          <h2 className="sechead__title">Handicap asiático</h2>
+          <span className="sechead__note">
+            linhas na perspectiva de <b className="sechead__who sechead__who--a">{playerA}</b>
+          </span>
+        </div>
+        <HandicapTable lines={stats.asian} prefix="ah" sample={sample} probe={probe} />
+
+        {stats.halftime && (
+          <>
+            <div className="sechead sechead--sub">
+              <h3 className="sechead__subtitle">1º tempo</h3>
+              <span className="sechead__note">{stats.halftime.sample} partidas com placar do intervalo</span>
+            </div>
+            <HandicapTable
+              lines={stats.halftime.asian}
+              prefix="hah"
+              sample={stats.halftime.sample}
+              probe={probe}
+            />
+          </>
+        )}
+      </section>
+    </>
   );
 }
