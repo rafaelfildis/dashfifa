@@ -47,6 +47,58 @@ function useActiveSection(enabled: boolean): string {
   return active;
 }
 
+/** O snapshot é regenerado uma vez por dia; passado isso, "online" engana. */
+const STALE_AFTER_HOURS = 12;
+
+interface Freshness {
+  tone: 'live' | 'stale' | 'off';
+  label: string;
+  stamp: string;
+  hint: string;
+  /** Aviso em texto corrido, para quando o cabeçalho não couber na tela. */
+  warning: string | null;
+}
+
+/**
+ * O ponto de status responde por duas perguntas diferentes: se a requisição
+ * funcionou e se o dado ainda é recente. Um build estático pode ter as duas
+ * respostas divergindo — requisição ok, dado de ontem —, e é aí que ele fica
+ * âmbar em vez de verde.
+ */
+function freshnessOf(snapshotAt: string | null, loadedAt: string | null, failed: boolean): Freshness {
+  if (failed) {
+    return {
+      tone: 'off',
+      label: 'Dados offline',
+      stamp: snapshotAt ? `dados de ${stamp(snapshotAt)}` : 'sem conexão',
+      hint: 'A última requisição falhou.',
+      warning: 'A última requisição falhou. Os números na tela são os do último carregamento.',
+    };
+  }
+
+  if (snapshotAt) {
+    const hours = Math.floor((Date.now() - new Date(snapshotAt).getTime()) / 3_600_000);
+    const stale = hours >= STALE_AFTER_HOURS;
+    return {
+      tone: stale ? 'stale' : 'live',
+      label: stale ? 'Dados defasados' : 'Dados online',
+      stamp: `dados de ${stamp(snapshotAt)}`,
+      hint: `O site publicado lê um snapshot regenerado uma vez por dia. Este tem ${hours} h.`,
+      warning: stale
+        ? `Estes números vêm do snapshot de ${stamp(snapshotAt)}, de ${hours} h atrás. O site publicado é regenerado uma vez por dia, então partidas recentes ainda não aparecem.`
+        : null,
+    };
+  }
+
+  return {
+    tone: 'live',
+    label: 'Dados online',
+    stamp: loadedAt ? `atualizado ${since(loadedAt)}` : 'carregando…',
+    hint: 'Backend ao vivo: o histórico é relido continuamente.',
+    warning: null,
+  };
+}
+
 function Skeleton() {
   return (
     <div className="skel" aria-hidden="true">
@@ -137,12 +189,12 @@ export function H2HPage({ league, onBack, snapshotAt }: Props) {
     };
   }, [league.id, playerA, playerB, teamA, teamB]);
 
-  // "atualizado há N min" só envelhece se algo redesenhar de tempos em tempos.
+  // A idade do dado só envelhece na tela se algo redesenhar de tempos em tempos
+  // — vale tanto para "há N min" quanto para o snapshot cruzar o limite de horas.
   useEffect(() => {
-    if (snapshotAt) return;
     const id = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(id);
-  }, [snapshotAt]);
+  }, []);
 
   /** Trocar de jogador invalida o time escolhido; trocar de lado, não. */
   function pickPlayer(side: 'a' | 'b', name: string) {
@@ -169,12 +221,7 @@ export function H2HPage({ league, onBack, snapshotAt }: Props) {
     setTeamsB(teamsA);
   }
 
-  const offline = Boolean(error);
-  const freshness = snapshotAt
-    ? `dados de ${stamp(snapshotAt)}`
-    : loadedAt
-      ? `atualizado ${since(loadedAt)}`
-      : 'carregando…';
+  const fresh = freshnessOf(snapshotAt, loadedAt, Boolean(error));
 
   const bothPicked = playerA !== '' && playerB !== '';
   const sameSelection = playerA !== '' && playerA === playerB;
@@ -195,11 +242,13 @@ export function H2HPage({ league, onBack, snapshotAt }: Props) {
             <span className="topbar__source num">{league.source}</span>
           </div>
           <div className="topbar__spacer" />
-          <div className="topbar__status">
-            <span className={`topbar__pulse${offline ? ' topbar__pulse--off' : ''}`} aria-hidden="true" />
-            <span className="topbar__status-text">{offline ? 'Dados offline' : 'Dados online'}</span>
+          <div className={`topbar__status topbar__status--${fresh.tone}`} title={fresh.hint}>
+            <span className={`topbar__pulse topbar__pulse--${fresh.tone}`} aria-hidden="true" />
+            <span className="topbar__status-text">{fresh.label}</span>
           </div>
-          <span className="topbar__stamp num">{freshness}</span>
+          <span className="topbar__stamp num" title={fresh.hint}>
+            {fresh.stamp}
+          </span>
           <button type="button" className="pill pill--ghost" onClick={onBack}>
             Ligas
           </button>
@@ -225,6 +274,13 @@ export function H2HPage({ league, onBack, snapshotAt }: Props) {
         </p>
 
         {error && <p className="card notice notice--warn">{error}</p>}
+
+        {/* O cabeçalho esconde o status em telas estreitas; o aviso não. */}
+        {fresh.warning && (
+          <p className={`staleness staleness--${fresh.tone}`} role="status">
+            <span aria-hidden="true">⚠</span> {fresh.warning}
+          </p>
+        )}
 
         {loading && <Skeleton />}
 

@@ -83,6 +83,14 @@ mesmo módulo `shared/` do servidor — os números são idênticos aos do modo 
 O cabeçalho mostra a data do snapshot, e o workflow o regenera todo dia às 06:10
 UTC, além de a cada push na `main`.
 
+O ponto de status do cabeçalho responde por *recência*, não por "a requisição
+funcionou": ele fica verde enquanto o snapshot tem menos de 12 horas
+(`STALE_AFTER_HOURS`) e vira âmbar depois disso, com o rótulo trocando para
+"Dados defasados" — cor sozinha nunca carrega a informação. Quando está âmbar,
+um aviso no topo do conteúdo explica a idade do dado, porque em telas estreitas
+o cabeçalho esconde o status. No modo servidor o carimbo vira "atualizado há N
+min" e o ponto não amarela: ali o histórico é relido continuamente.
+
 **Para ativar na primeira vez:** em *Settings → Pages*, defina *Source* como
 **GitHub Actions**. Sem isso o job de deploy falha.
 
