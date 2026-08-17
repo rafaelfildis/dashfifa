@@ -133,6 +133,26 @@
 
 /* H2H view */
 
+.h2h-view__league {
+  margin-bottom: 12px;
+}
+
+.h2h-view__league select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.league-board__error,
+.league-board__loading {
+  color: var(--text-dim);
+  text-align: center;
+  padding: 24px 0;
+}
+
 .h2h-view__selectors {
   display: flex;
   align-items: center;

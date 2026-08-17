@@ -1,32 +1,44 @@
-# React + TypeScript + Vite
+# dashfifa
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Dashboard de e-soccer: jogos ao vivo e comparação Head-to-Head entre jogadores,
+agregando dados de três fontes:
 
-Currently, two official plugins are available:
+- [ESportsBattle](https://football.esportsbattle.com/) — E-Soccer Battle (8min) e Battle Volta (6min)
+- [GT Leagues](https://www.gtleagues.com/) (12min)
+- [H2H GG League](https://h2hggl.com/) (8min)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Arquitetura
 
-## React Compiler
+- `src/` — frontend React + TypeScript (Vite)
+- `server/` — backend Express que busca e normaliza os dados das três fontes
+  (necessário porque ESportsBattle e H2H GG League não liberam CORS para
+  chamadas diretas do navegador)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+O frontend consome apenas `/api/*`, que o Vite faz proxy para o backend em
+desenvolvimento (`vite.config.ts`).
 
-## Expanding the Oxlint configuration
+## Rodando localmente
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+Backend (porta 3001):
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+cd server
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Frontend (porta 5173):
+
+```bash
+npm install
+npm run dev
+```
+
+## Head-to-Head
+
+- **H2H GG League**: usa a API nativa de pareamento da própria plataforma —
+  estatísticas completas de qualquer par de jogadores.
+- **E-Soccer Battle, Battle Volta, GT Leagues**: essas fontes não expõem um
+  endpoint de H2H por jogador, então o backend acumula um histórico próprio
+  a partir dos jogos observados desde que o servidor está rodando. A precisão
+  cresce com o tempo de execução do servidor.

@@ -23,20 +23,3 @@ export interface Match {
   home: MatchSide;
   away: MatchSide;
 }
-
-export interface LiveResponse {
-  leagues: League[];
-  matches: Match[];
-}
-
-export interface H2HResponse {
-  playerA: string;
-  playerB: string;
-  winsA: number;
-  winsB: number;
-  draws: number;
-  goalsA: number | null;
-  goalsB: number | null;
-  matches: Match[];
-  source: 'native' | 'sampled';
-}
